@@ -10,11 +10,61 @@ from pdf2image import convert_from_bytes
 import io
 from PIL import Image
 import logging
+import streamlit.components.v1 as components
 
 # Set up logging for better error tracking
 logging.basicConfig(level=logging.INFO)
 
-# Streamlit Widgets for API Key Input
+# Set page configuration
+st.set_page_config(
+    page_title="📝 OLAT Fragen Generator",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# Titel
+st.title("📝 OLAT Fragen Generator")
+
+# Seitenleiste für Anweisungen
+with st.sidebar:
+    st.header("❗ **So verwenden Sie diese App**")
+    
+    st.markdown("""
+    1. **Geben Sie Ihren OpenAI-API-Schlüssel ein**: Erhalten Sie Ihren API-Schlüssel von [OpenAI](https://platform.openai.com/account/api-keys) und geben Sie ihn im Feld *OpenAI-API-Schlüssel* ein.
+    """)
+    
+    # Video in die Seitenleiste einbetten
+    components.html("""
+        <iframe width="100%" height="180" src="https://www.youtube.com/embed/OB99E7Y1cMA" 
+        title="Demo-Video auf Deutsch" frameborder="0" allow="accelerometer; autoplay; 
+        clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen>
+        </iframe>
+    """, height=180)
+    
+    # Fortfahren mit zusätzlichen Anweisungen
+    st.markdown("""
+    2. **Laden Sie eine PDF, DOCX oder Bilddatei hoch**: Wählen Sie eine Datei aus Ihrem Computer aus.
+    3. **Sprache auswählen**: Wählen Sie die gewünschte Sprache für die generierten Fragen.
+    4. **Fragetypen auswählen**: Wählen Sie die Typen der Fragen, die Sie generieren möchten.
+    5. **Fragen generieren**: Klicken Sie auf die Schaltfläche "Generate Questions", um den Prozess zu starten.
+    6. **Generierte Inhalte herunterladen**: Nach der Generierung können Sie die Antworten herunterladen.
+    """)
+    
+    # Seitenleiste oder Fußzeile für Lizenz- und Kontaktinformationen
+    st.markdown("---")
+    st.header("📜 Lizenz")
+    st.markdown("""
+    Diese Anwendung steht unter der [MIT-Lizenz](https://opensource.org/licenses/MIT). 
+    Sie dürfen diese Software verwenden, ändern und weitergeben, solange die ursprüngliche Lizenz beibehalten wird.
+    """)
+
+    st.header("💬 Kontakt")
+    st.markdown("""
+    Für Unterstützung, Fragen oder um mehr über die Nutzung dieser App zu erfahren, kannst du gerne auf mich zukommen.
+    **Kontakt**: [Pietro](mailto:pietro.rossi@bbw.ch)
+    """)
+
+# Streamlit Widgets für API-Schlüssel Eingabe
 st.header("🔑 Geben Sie Ihren OpenAI-API-Schlüssel ein")
 api_key = st.text_input("OpenAI-API-Schlüssel:", type="password")
 
@@ -30,7 +80,7 @@ else:
     st.warning("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein, um fortzufahren.")
     st.stop()
 
-# List of available message types
+# Liste der verfügbaren Nachrichtentypen
 MESSAGE_TYPES = [
     "single_choice",
     "multiple_choice1",
@@ -44,12 +94,12 @@ MESSAGE_TYPES = [
 
 @st.cache_data
 def read_prompt_from_md(filename):
-    """Read the prompt from a markdown file and cache the result."""
-    with open(f"{filename}.md", "r") as file:
+    """Liest den Prompt aus einer Markdown-Datei und speichert das Ergebnis zwischen."""
+    with open(f"{filename}.md", "r", encoding="utf-8") as file:
         return file.read()
 
 def process_image(_image):
-    """Process and resize an image to reduce memory footprint."""
+    """Verarbeitet und verkleinert ein Bild, um den Speicherverbrauch zu reduzieren."""
     if isinstance(_image, (str, bytes)):
         img = Image.open(io.BytesIO(base64.b64decode(_image) if isinstance(_image, str) else _image))
     elif isinstance(_image, Image.Image):
@@ -57,16 +107,16 @@ def process_image(_image):
     else:
         img = Image.open(_image)
 
-    # Convert to RGB mode if it's not
+    # Konvertiere in RGB-Modus, falls erforderlich
     if img.mode != 'RGB':
         img = img.convert('RGB')
 
-    # Resize if the image is too large
-    max_size = 1000  # Reduced max size to reduce memory consumption
+    # Verkleinern, wenn das Bild zu groß ist
+    max_size = 1000  # Reduzierte Maximalgröße zur Verringerung des Speicherverbrauchs
     if max(img.size) > max_size:
         img.thumbnail((max_size, max_size))
 
-    # Save to bytes
+    # Speichern in Bytes
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='JPEG')
     img_byte_arr = img_byte_arr.getvalue()
@@ -74,7 +124,7 @@ def process_image(_image):
     return base64.b64encode(img_byte_arr).decode('utf-8')
 
 def replace_german_sharp_s(text):
-    """Replace all occurrences of 'ß' with 'ss'."""
+    """Ersetzt alle Vorkommen von 'ß' durch 'ss'."""
     return text.replace('ß', 'ss')
 
 
@@ -147,59 +197,59 @@ def transform_output(json_string):
         json_data = json.loads(cleaned_json_string)
         fib_output, ic_output = convert_json_to_text_format(json_data)
         
-        # Apply the cleaning function here
+        # Anwenden der Reinigungsfunktion
         fib_output = replace_german_sharp_s(fib_output)
         ic_output = replace_german_sharp_s(ic_output)
 
         return f"{ic_output}\n---\n{fib_output}"
     except json.JSONDecodeError as e:
 
-        st.error(f"Error parsing JSON: {e}")
-        st.text("Cleaned input:")
+        st.error(f"Fehler beim Parsen von JSON: {e}")
+        st.text("Bereinigte Eingabe:")
         st.code(cleaned_json_string, language='json')
-        st.text("Original input:")
+        st.text("Originale Eingabe:")
         st.code(json_string)
         
         try:
             if not cleaned_json_string.strip().endswith(']'):
                 cleaned_json_string += ']'
             partial_json = json.loads(cleaned_json_string)
-            st.warning("Attempted to salvage partial JSON. Results may be incomplete.")
+            st.warning("Teilweises JSON konnte gerettet werden. Ergebnisse können unvollständig sein.")
             fib_output, ic_output = convert_json_to_text_format(partial_json)
             return f"{ic_output}\n---\n{fib_output}"
         except:
-            st.error("Unable to salvage partial JSON.")
-            return "Error: Invalid JSON format"
+            st.error("Teilweises JSON konnte nicht gerettet werden.")
+            return "Fehler: Ungültiges JSON-Format"
     except Exception as e:
-        st.error(f"Error processing input: {str(e)}")
-        st.text("Original input:")
+        st.error(f"Fehler bei der Verarbeitung der Eingabe: {str(e)}")
+        st.text("Originale Eingabe:")
         st.code(json_string)
-        return "Error: Unable to process input"
+        return "Fehler: Eingabe konnte nicht verarbeitet werden"
 
 def get_chatgpt_response(prompt, image=None, selected_language="English"):
-    """Fetch response from OpenAI GPT with error handling."""
+    """Ruft eine Antwort von OpenAI GPT mit Fehlerbehandlung ab."""
     try:
-        # Step 2: Create a system prompt that includes language instruction
+        # System-Prompt erstellen, der Sprachinstruktionen enthält
         system_prompt = (
             """
-            You are an expert educator specializing in generating test questions and answers across all topics, following Bloom’s Taxonomy. Your role is to create high-quality Q&A sets based on the material provided by the user, ensuring each question aligns with a specific level of Bloom’s Taxonomy: Remember, Understand, Apply, Analyze, Evaluate, and Create.
+            Du bist ein Experte im Bildungsbereich, spezialisiert auf die Erstellung von Testfragen und -antworten zu allen Themen, unter Einhaltung der Bloom's Taxonomy. Deine Aufgabe ist es, hochwertige Frage-Antwort-Sets basierend auf dem vom Benutzer bereitgestellten Material zu erstellen, wobei jede Frage einer spezifischen Ebene der Bloom's Taxonomy entspricht: Erinnern, Verstehen, Anwenden, Analysieren, Bewerten und Erstellen.
 
-            The user will provide input by either uploading a text or an image. If an image is uploaded, you will extract the relevant information and key concepts from it before proceeding. Your tasks are as follows:
+            Der Benutzer wird entweder Text oder ein Bild hochladen. Wenn ein Bild hochgeladen wird, extrahierst du die relevanten Informationen und Schlüsselkonzepte daraus, bevor du fortfährst. Deine Aufgaben sind wie folgt:
 
-            Input Analysis:
+            **Input-Analyse:**
 
-            For text uploads, carefully analyze the content to understand the key concepts and important information.
-            For image uploads, interpret and extract relevant information (e.g., diagrams, charts, pictures, or infographics) to derive educational material.
+            - Für Text-Uploads analysierst du den Inhalt sorgfältig, um die Schlüsselkonzepte und wichtigen Informationen zu verstehen.
+            - Für Bild-Uploads interpretierst und extrahierst du relevante Informationen (z.B. Diagramme, Grafiken, Bilder oder Infografiken), um Bildungsinhalte abzuleiten.
 
-            Question Generation by Bloom Level:
-            Based on the analyzed material (from text or image), generate questions across all six levels of Bloom’s Taxonomy:
+            **Fragen-Generierung nach Bloom-Ebene:**
+            Basierend auf dem analysierten Material (aus Text oder Bild) generierst du Fragen über alle sechs Ebenen der Bloom's Taxonomy:
 
-            Remember: Simple recall-based questions.
-            Understand: Questions that assess comprehension of the material.
-            Apply: Questions requiring the use of knowledge in practical situations.
-            Analyze: Questions that involve breaking down the material and examining relationships.
-            Evaluate: Critical thinking questions requiring judgments or assessments.
-            Create: Open-ended tasks that prompt the student to design or construct something based on the information provided.
+            - **Erinnern**: Einfache, abrufbasierte Fragen.
+            - **Verstehen**: Fragen, die das Verständnis des Materials bewerten.
+            - **Anwenden**: Fragen, die die Anwendung des Wissens in praktischen Situationen erfordern.
+            - **Analysieren**: Fragen, die das Zerlegen des Materials und die Untersuchung von Zusammenhängen beinhalten.
+            - **Bewerten**: Kritisches Denkfragen, die Urteile oder Bewertungen erfordern.
+            - **Erstellen**: Offene Aufgaben, die den Schüler dazu auffordern, etwas zu entwerfen oder zu konstruieren basierend auf den bereitgestellten Informationen.
             """
         )
         
@@ -236,77 +286,77 @@ def get_chatgpt_response(prompt, image=None, selected_language="English"):
         
         return response.choices[0].message.content
     except Exception as e:
-        st.error(f"Error communicating with OpenAI API: {e}")
-        logging.error(f"Error communicating with OpenAI API: {e}")
+        st.error(f"Fehler bei der Kommunikation mit der OpenAI API: {e}")
+        logging.error(f"Fehler bei der Kommunikation mit der OpenAI API: {e}")
         return None
 
 def process_images(images, selected_language):
-    """Process uploaded images and generate questions."""
+    """Verarbeitet hochgeladene Bilder und generiert Fragen."""
     for idx, image in enumerate(images):
-        st.image(image, caption=f'Page {idx+1}', use_column_width=True)
+        st.image(image, caption=f'Seite {idx+1}', use_column_width=True)
 
-        # Text area for user input and learning goals
-        user_input = st.text_area(f"Enter your question or instructions for Page {idx+1}:", key=f"text_area_{idx}")
-        learning_goals = st.text_area(f"Learning Goals for Page {idx+1} (Optional):", key=f"learning_goals_{idx}")
-        selected_types = st.multiselect(f"Select question types for Page {idx+1}:", MESSAGE_TYPES, key=f"selected_types_{idx}")
+        # Textbereich für Benutzereingaben und Lernziele
+        user_input = st.text_area(f"Geben Sie Ihre Frage oder Anweisungen für Seite {idx+1} ein:", key=f"text_area_{idx}")
+        learning_goals = st.text_area(f"Lernziele für Seite {idx+1} (Optional):", key=f"learning_goals_{idx}")
+        selected_types = st.multiselect(f"Wählen Sie die Fragetypen für Seite {idx+1} aus:", MESSAGE_TYPES, key=f"selected_types_{idx}")
 
-        # Button to generate questions for the page
-        if st.button(f"Generate Questions for Page {idx}", key=f"generate_button_{idx}"):
-            # Only generate questions if there is user input and selected question types
+        # Button zum Generieren von Fragen für die Seite
+        if st.button(f"Fragen für Seite {idx+1} generieren", key=f"generate_button_{idx}"):
+            # Fragen nur generieren, wenn Benutzereingaben und ausgewählte Fragetypen vorhanden sind
             if user_input and selected_types:
-                # Pass the selected_language here
+                # Übergabe der ausgewählten Sprache hier
                 generate_questions_with_image(user_input, learning_goals, selected_types, image, selected_language)
             else:
-                st.warning(f"Please enter text and select question types for Page {idx+1}.")
+                st.warning(f"Bitte geben Sie Text ein und wählen Sie Fragetypen für Seite {idx+1} aus.")
 
 def generate_questions_with_image(user_input, learning_goals, selected_types, image, selected_language):
-    """Generate questions for the image and handle errors."""
+    """Generiert Fragen für das Bild und behandelt Fehler."""
     all_responses = ""
     generated_content = {}
     for msg_type in selected_types:
         prompt_template = read_prompt_from_md(msg_type)
-        full_prompt = f"{prompt_template}\n\nUser Input: {user_input}\n\nLearning Goals: {learning_goals}"
+        full_prompt = f"{prompt_template}\n\nBenutzereingabe: {user_input}\n\nLernziele: {learning_goals}"
         try:
             response = get_chatgpt_response(full_prompt, image=image, selected_language=selected_language)
             if response:
                 if msg_type == "inline_fib":
                     processed_response = transform_output(response)
-                    generated_content[f"{msg_type.replace('_', ' ').title()} (Processed)"] = processed_response
+                    generated_content[f"{msg_type.replace('_', ' ').title()} (Verarbeitet)"] = processed_response
                     all_responses += f"{processed_response}\n\n"
                 else:
                     generated_content[msg_type.replace('_', ' ').title()] = response
                     all_responses += f"{response}\n\n"
             else:
-                st.error(f"Failed to generate a response for {msg_type}.")
+                st.error(f"Fehler bei der Generierung einer Antwort für {msg_type}.")
         except Exception as e:
-            st.error(f"An error occurred for {msg_type}: {str(e)}")
+            st.error(f"Ein Fehler ist für {msg_type} aufgetreten: {str(e)}")
     
-    # Apply cleaning function to all responses
+    # Reinigungsfunktion auf alle Antworten anwenden
     all_responses = replace_german_sharp_s(all_responses)
 
-    # Display generated content with checkmarks
-    st.subheader("Generated Content:")
+    # Generierten Inhalt mit Häkchen anzeigen
+    st.subheader("Generierter Inhalt:")
     for title in generated_content.keys():
         st.write(f"✔ {title}")
 
-    # Download button for all responses
+    # Download-Button für alle Antworten
     if all_responses:
         st.download_button(
-            label="Download All Responses",
+            label="Alle Antworten herunterladen",
             data=all_responses,
-            file_name="all_responses.txt",
+            file_name="alle_antworten.txt",
             mime="text/plain"
         )
 
 @st.cache_data
 def convert_pdf_to_images(file):
-    """Convert PDF pages to images."""
+    """Konvertiert PDF-Seiten in Bilder."""
     images = convert_from_bytes(file.read())
     return images
 
 @st.cache_data
 def extract_text_from_pdf(file):
-    """Extract text from PDF using PyPDF2."""
+    """Extrahiert Text aus PDF mit PyPDF2."""
     pdf_reader = PyPDF2.PdfReader(file)
     text = ""
     for page in pdf_reader.pages:
@@ -317,77 +367,79 @@ def extract_text_from_pdf(file):
 
 @st.cache_data
 def extract_text_from_docx(file):
-    """Extract text from DOCX file."""
+    """Extrahiert Text aus DOCX-Datei."""
     doc = docx.Document(file)
     text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
     return text.strip()
 
+def is_pdf_ocr(text):
+    """Prüft, ob das PDF OCR-Text enthält (Implementierung erforderlich)."""
+    # Dummy-Implementierung, bitte nach Bedarf anpassen
+    return bool(text)
+
 def process_pdf(file):
     text_content = extract_text_from_pdf(file)
     
-    # If no text is found, assume it's a non-OCR PDF
+    # Wenn kein Text gefunden wurde, nehme an, dass es ein nicht-OCR-PDF ist
     if not text_content or not is_pdf_ocr(text_content):
-        st.warning("This PDF is not OCRed. Text extraction failed. Please upload an OCRed PDF.")
-        return None, convert_pdf_to_images(file)  # Fallback to image processing
+        st.warning("Dieses PDF ist nicht OCR-geschützt. Textextraktion fehlgeschlagen. Bitte laden Sie ein OCR-PDF hoch.")
+        return None, convert_pdf_to_images(file)  # Fallback zur Bildverarbeitung
     else:
         return text_content, None
 
 def main():
-    """Main function for the Streamlit app."""
-    st.title("OLAT Fragen Generator")
-
-    # Step 1: Language selection using radio buttons
-    st.subheader("Select the Language for Generated Questions:")
+    """Hauptfunktion für die Streamlit-App."""
+    # Sprachenauswahl mit Radiobuttons
+    st.subheader("Sprache für generierte Fragen auswählen:")
     languages = {
-        "German": "German",
-        "English": "English",
-        "French": "French",
-        "Italian": "Italian",
-        "Spanish": "Spanish"
+        "Deutsch": "German",
+        "Englisch": "English",
+        "Französisch": "French",
+        "Italienisch": "Italian",
+        "Spanisch": "Spanish"
     }
-    selected_language = st.radio("Choose the language for output:", list(languages.values()), index=0)
+    selected_language = st.radio("Wählen Sie die Sprache für die Ausgabe:", list(languages.keys()), index=0)
 
-    # File uploader section
-    uploaded_file = st.file_uploader("Upload a PDF, DOCX, or image file", type=["pdf", "docx", "jpg", "jpeg", "png"])
+    # Dateiuploader-Bereich
+    uploaded_file = st.file_uploader("Laden Sie eine PDF, DOCX oder Bilddatei hoch", type=["pdf", "docx", "jpg", "jpeg", "png"])
 
     text_content = ""
     image_content = None
     images = []
 
-    
-    # Reset cache when a new file is uploaded
+    # Cache zurücksetzen, wenn eine neue Datei hochgeladen wird
     if uploaded_file:
-        st.cache_data.clear()  # This clears the cache to avoid previous cached values
-    
+        st.cache_data.clear()  # Dies löscht den Cache, um vorherige zwischengespeicherte Werte zu vermeiden
+
     if uploaded_file is not None:
         if uploaded_file.type == "application/pdf":
             text_content = extract_text_from_pdf(uploaded_file)
             if text_content:
-                st.success("Text aus PDF extrahiert. Sie können es nun im folgenden Textfeld bearbeiten. PDFs, die länger als 5 Seiten sind, sollten gekürzt werden.")
+                st.success("Text aus PDF extrahiert. Sie können ihn nun im folgenden Textfeld bearbeiten. PDFs, die länger als 5 Seiten sind, sollten gekürzt werden.")
             else:
                 images = convert_pdf_to_images(uploaded_file)
-                st.success("PDF converted to images. You can now ask questions about each page.")
+                st.success("PDF in Bilder konvertiert. Sie können jetzt Fragen zu jeder Seite stellen.")
         elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
             text_content = extract_text_from_docx(uploaded_file)
-            st.success("Text extracted successfully. You can now edit it in the text area below.")
+            st.success("Text erfolgreich extrahiert. Sie können ihn nun im folgenden Textbereich bearbeiten.")
         elif uploaded_file.type.startswith('image/'):
             image_content = Image.open(uploaded_file)
-            st.image(image_content, caption='Uploaded Image', use_column_width=True)
-            st.success("Image uploaded successfully. You can now ask questions about the image.")
+            st.image(image_content, caption='Hochgeladenes Bild', use_column_width=True)
+            st.success("Bild erfolgreich hochgeladen. Sie können jetzt Fragen zum Bild stellen.")
         else:
-            st.error("Unsupported file type. Please upload a PDF, DOCX, or image file.")
+            st.error("Nicht unterstützter Dateityp. Bitte laden Sie eine PDF, DOCX oder Bilddatei hoch.")
 
-    # Process images if any, otherwise process text or image content
+    # Bilder verarbeiten, falls vorhanden, ansonsten Text oder Bildinhalt verarbeiten
     if images:
-        process_images(images, selected_language)  # Pass the selected_language here
+        process_images(images, selected_language)  # Übergabe der ausgewählten Sprache hier
     else:
-        user_input = st.text_area("Enter your text or question about the image:", value=text_content)
-        learning_goals = st.text_area("Learning Goals (Optional):")
+        user_input = st.text_area("Geben Sie Ihren Text oder Ihre Frage zum Bild ein:", value=text_content)
+        learning_goals = st.text_area("Lernziele (Optional):")
         
-        # Select question types to generate
-        selected_types = st.multiselect("Select question types to generate:", MESSAGE_TYPES)
+        # Fragetypen auswählen
+        selected_types = st.multiselect("Wählen Sie die Fragetypen zur Generierung aus:", MESSAGE_TYPES)
         
-        # Custom CSS for light blue background in info callouts
+        # Benutzerdefiniertes CSS für hellblauen Hintergrund in Info-Callouts
         st.markdown(
             """
             <style>
@@ -413,74 +465,74 @@ def main():
             """, unsafe_allow_html=True
         )
         
-        # Cost Information with custom info callout style
+        # Kosteninformationen mit benutzerdefiniertem Info-Callout-Stil
         st.markdown('''
         <div class="custom-info">
-            <strong>ℹ️ Cost Information:</strong>
+            <strong>ℹ️ Kosteninformationen:</strong>
             <ul>
-                <li>The cost of usage depends on the <strong>length of the input</strong> (ranging from $0.01 to $0.1).</li>
-                <li>Each selected question type will cost approximately $0.01.</li>
+                <li>Die Nutzungskosten hängen von der <strong>Länge der Eingabe</strong> ab (zwischen 0,01 $ und 0,1 $).</li>
+                <li>Jeder ausgewählte Fragetyp kostet ungefähr 0,01 $.</li>
             </ul>
         </div>
         ''', unsafe_allow_html=True)
         
-        # Question types with success style
+        # Fragetypen mit Erfolg-Stil
         st.markdown('''
         <div class="custom-success">
-            <strong>✅ Multiple Choice Questions:</strong>
+            <strong>✅ Multiple-Choice-Fragen:</strong>
             <ul>
-                <li>All multiple-choice questions have a <strong>maximum of 3 points</strong>.</li>
-                <li><strong>multiple_choice1</strong>: 1 out of 4 correct answers.</li>
-                <li><strong>multiple_choice2</strong>: 2 out of 4 correct answers.</li>
-                <li><strong>multiple_choice3</strong>: 3 out of 4 correct answers.</li>
-            </ul>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        st.markdown('''
-        <div class="custom-success">
-            <strong>✅ Inline/FIB Questions:</strong>
-            <ul>
-                <li>The <strong>Inline</strong> and <strong>FiB</strong> questions are identical in content.</li>
-                <li>FiB = type the missing word.</li>
-                <li>Inline = choose the missing word.</li>
+                <li>Alle Multiple-Choice-Fragen haben maximal 3 Punkte.</li>
+                <li><strong>multiple_choice1</strong>: 1 von 4 richtigen Antworten.</li>
+                <li><strong>multiple_choice2</strong>: 2 von 4 richtigen Antworten.</li>
+                <li><strong>multiple_choice3</strong>: 3 von 4 richtigen Antworten.</li>
             </ul>
         </div>
         ''', unsafe_allow_html=True)
         
         st.markdown('''
         <div class="custom-success">
-            <strong>✅ Other Question Types:</strong>
+            <strong>✅ Inline/FIB-Fragen:</strong>
             <ul>
-                <li><strong>Single Choice</strong>: 4 Answers, 1 Point per Question.</li>
-                <li><strong>KPRIM</strong>: 4 Answers, 5 Points (4/4 correct), 2.5 Points (3/4 correct), 0 Points (50% or less correct).</li>
-                <li><strong>True/False</strong>: 3 Answers, 3 Points per Question.</li>
-                <li><strong>Drag & Drop</strong>: Variable Points.</li>
+                <li>Die <strong>Inline</strong> und <strong>FIB</strong> Fragen sind inhaltlich identisch.</li>
+                <li>FIB = fehlendes Wort eingeben.</li>
+                <li>Inline = fehlendes Wort auswählen.</li>
             </ul>
         </div>
         ''', unsafe_allow_html=True)
         
-        # Warnings with custom warning style
+        st.markdown('''
+        <div class="custom-success">
+            <strong>✅ Andere Fragetypen:</strong>
+            <ul>
+                <li><strong>Single Choice</strong>: 4 Antworten, 1 Punkt pro Frage.</li>
+                <li><strong>KPRIM</strong>: 4 Antworten, 5 Punkte (4/4 korrekt), 2,5 Punkte (3/4 korrekt), 0 Punkte (50% oder weniger korrekt).</li>
+                <li><strong>True/False</strong>: 3 Antworten, 3 Punkte pro Frage.</li>
+                <li><strong>Drag & Drop</strong>: Variable Punkte.</li>
+            </ul>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        # Warnungen mit benutzerdefiniertem Warnungs-Stil
         st.markdown('''
         <div class="custom-warning">
-            <strong>⚠️ Warnings:</strong>
+            <strong>⚠️ Warnungen:</strong>
             <ul>
-                <li><strong>Always double-check that Total Points = Sum of correct answers' Points.</strong></li>
-                <li><strong>Always double-check the content of the answers.</strong></li>
+                <li><strong>Überprüfen Sie immer, dass die Gesamtpunkte = Summe der Punkte der korrekten Antworten sind.</strong></li>
+                <li><strong>Überprüfen Sie immer den Inhalt der Antworten.</strong></li>
             </ul>
         </div>
         ''', unsafe_allow_html=True)
 
     
-        # Generate questions button
-        if st.button("Generate Questions"):
+        # Button zum Generieren von Fragen
+        if st.button("Fragen generieren"):
             if (user_input or image_content) and selected_types:
-                # Ensure that the selected_language is passed to the function
+                # Übergabe der ausgewählten Sprache zur Funktion
                 generate_questions_with_image(user_input, learning_goals, selected_types, image_content, selected_language)              
             elif not user_input and not image_content:
-                st.warning("Please enter some text, upload a file, or upload an image.")
+                st.warning("Bitte geben Sie etwas Text ein, laden Sie eine Datei hoch oder laden Sie ein Bild hoch.")
             elif not selected_types:
-                st.warning("Please select at least one question type.")
+                st.warning("Bitte wählen Sie mindestens einen Fragetyp aus.")
 
 if __name__ == "__main__":
     main()
