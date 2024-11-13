@@ -14,8 +14,21 @@ import logging
 # Set up logging for better error tracking
 logging.basicConfig(level=logging.INFO)
 
-# Initialize OpenAI client
-client = OpenAI(api_key=st.secrets["openai"]["api_key"])
+# Streamlit Widgets for API Key Input
+st.header("🔑 Geben Sie Ihren OpenAI-API-Schlüssel ein")
+api_key = st.text_input("OpenAI-API-Schlüssel:", type="password")
+
+# Initialize OpenAI client only if API key is provided
+if api_key:
+    try:
+        client = OpenAI(api_key=api_key)
+        st.success("API-Schlüssel erfolgreich erkannt und verbunden.")
+    except Exception as e:
+        st.error(f"Fehler bei der Initialisierung des OpenAI-Clients: {e}")
+        st.stop()
+else:
+    st.warning("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein, um fortzufahren.")
+    st.stop()
 
 # List of available message types
 MESSAGE_TYPES = [
@@ -163,7 +176,6 @@ def transform_output(json_string):
         st.code(json_string)
         return "Error: Unable to process input"
 
-
 def get_chatgpt_response(prompt, image=None, selected_language="English"):
     """Fetch response from OpenAI GPT with error handling."""
     try:
@@ -285,7 +297,6 @@ def generate_questions_with_image(user_input, learning_goals, selected_types, im
             file_name="all_responses.txt",
             mime="text/plain"
         )
-
 
 @st.cache_data
 def convert_pdf_to_images(file):
@@ -463,14 +474,13 @@ def main():
     
         # Generate questions button
         if st.button("Generate Questions"):
-            if user_input or image_content and selected_types:
+            if (user_input or image_content) and selected_types:
                 # Ensure that the selected_language is passed to the function
                 generate_questions_with_image(user_input, learning_goals, selected_types, image_content, selected_language)              
             elif not user_input and not image_content:
                 st.warning("Please enter some text, upload a file, or upload an image.")
             elif not selected_types:
                 st.warning("Please select at least one question type.")
-
 
 if __name__ == "__main__":
     main()
