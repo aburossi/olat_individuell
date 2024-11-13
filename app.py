@@ -12,20 +12,20 @@ from PIL import Image
 import logging
 import streamlit.components.v1 as components
 
-# Set up logging for better error tracking
+# Logging für bessere Fehlerverfolgung einrichten
 logging.basicConfig(level=logging.INFO)
 
-# Set page configuration
+# Seitenkonfiguration festlegen
 st.set_page_config(
     page_title="📝 OLAT Fragen Generator",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Titel
+# Titel der App
 st.title("📝 OLAT Fragen Generator")
 
-# Seitenleiste für Anweisungen
+# Seitenleiste für Anweisungen und Zusatzinformationen
 with st.sidebar:
     st.header("❗ **So verwenden Sie diese App**")
     
@@ -33,7 +33,7 @@ with st.sidebar:
     1. **Geben Sie Ihren OpenAI-API-Schlüssel ein**: Erhalten Sie Ihren API-Schlüssel von [OpenAI](https://platform.openai.com/account/api-keys) und geben Sie ihn im Feld *OpenAI-API-Schlüssel* ein.
     """)
     
-    # Video in die Seitenleiste einbetten
+    # YouTube-Video in die Seitenleiste einbetten
     components.html("""
         <iframe width="100%" height="180" src="https://www.youtube.com/embed/OB99E7Y1cMA" 
         title="Demo-Video auf Deutsch" frameborder="0" allow="accelerometer; autoplay; 
@@ -41,16 +41,72 @@ with st.sidebar:
         </iframe>
     """, height=180)
     
-    # Fortfahren mit zusätzlichen Anweisungen
+    # Weitere Anweisungen
     st.markdown("""
-    2. **Laden Sie eine PDF, DOCX oder Bilddatei hoch**: Wählen Sie eine Datei aus Ihrem Computer aus.
+    2. **Laden Sie eine PDF, DOCX oder Bilddatei hoch**: Wählen Sie eine Datei von Ihrem Computer aus.
     3. **Sprache auswählen**: Wählen Sie die gewünschte Sprache für die generierten Fragen.
     4. **Fragetypen auswählen**: Wählen Sie die Typen der Fragen, die Sie generieren möchten.
-    5. **Fragen generieren**: Klicken Sie auf die Schaltfläche "Generate Questions", um den Prozess zu starten.
+    5. **Fragen generieren**: Klicken Sie auf die Schaltfläche "Fragen generieren", um den Prozess zu starten.
     6. **Generierte Inhalte herunterladen**: Nach der Generierung können Sie die Antworten herunterladen.
     """)
-    
-    # Seitenleiste oder Fußzeile für Lizenz- und Kontaktinformationen
+
+    # Kosteninformationen und Frage-Erklärungen
+    st.markdown('''
+    <div class="custom-info">
+        <strong>ℹ️ Kosteninformationen:</strong>
+        <ul>
+            <li>Die Nutzungskosten hängen von der <strong>Länge der Eingabe</strong> ab (zwischen 0,01 $ und 0,1 $).</li>
+            <li>Jeder ausgewählte Fragetyp kostet ungefähr 0,01 $.</li>
+        </ul>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    st.markdown('''
+    <div class="custom-success">
+        <strong>✅ Multiple-Choice-Fragen:</strong>
+        <ul>
+            <li>Alle Multiple-Choice-Fragen haben maximal 3 Punkte.</li>
+            <li><strong>multiple_choice1</strong>: 1 von 4 richtigen Antworten.</li>
+            <li><strong>multiple_choice2</strong>: 2 von 4 richtigen Antworten.</li>
+            <li><strong>multiple_choice3</strong>: 3 von 4 richtigen Antworten.</li>
+        </ul>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    st.markdown('''
+    <div class="custom-success">
+        <strong>✅ Inline/FIB-Fragen:</strong>
+        <ul>
+            <li>Die <strong>Inline</strong> und <strong>FIB</strong> Fragen sind inhaltlich identisch.</li>
+            <li>FIB = fehlendes Wort eingeben.</li>
+            <li>Inline = fehlendes Wort auswählen.</li>
+        </ul>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    st.markdown('''
+    <div class="custom-success">
+        <strong>✅ Andere Fragetypen:</strong>
+        <ul>
+            <li><strong>Single Choice</strong>: 4 Antworten, 1 Punkt pro Frage.</li>
+            <li><strong>KPRIM</strong>: 4 Antworten, 5 Punkte (4/4 korrekt), 2,5 Punkte (3/4 korrekt), 0 Punkte (50% oder weniger korrekt).</li>
+            <li><strong>True/False</strong>: 3 Antworten, 3 Punkte pro Frage.</li>
+            <li><strong>Drag & Drop</strong>: Variable Punkte.</li>
+        </ul>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    st.markdown('''
+    <div class="custom-warning">
+        <strong>⚠️ Warnungen:</strong>
+        <ul>
+            <li><strong>Überprüfen Sie immer, dass die Gesamtpunkte = Summe der Punkte der korrekten Antworten sind.</strong></li>
+            <li><strong>Überprüfen Sie immer den Inhalt der Antworten.</strong></li>
+        </ul>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    # Trennlinie und Lizenzinformationen
     st.markdown("---")
     st.header("📜 Lizenz")
     st.markdown("""
@@ -58,6 +114,7 @@ with st.sidebar:
     Sie dürfen diese Software verwenden, ändern und weitergeben, solange die ursprüngliche Lizenz beibehalten wird.
     """)
 
+    # Kontaktinformationen
     st.header("💬 Kontakt")
     st.markdown("""
     Für Unterstützung, Fragen oder um mehr über die Nutzung dieser App zu erfahren, kannst du gerne auf mich zukommen.
@@ -68,19 +125,17 @@ with st.sidebar:
 st.header("🔑 Geben Sie Ihren OpenAI-API-Schlüssel ein")
 api_key = st.text_input("OpenAI-API-Schlüssel:", type="password")
 
-# Initialize OpenAI client only if API key is provided
+# Initialize OpenAI client if an API key is provided
+client = None
 if api_key:
     try:
         client = OpenAI(api_key=api_key)
         st.success("API-Schlüssel erfolgreich erkannt und verbunden.")
     except Exception as e:
         st.error(f"Fehler bei der Initialisierung des OpenAI-Clients: {e}")
-        st.stop()
-else:
-    st.warning("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein, um fortzufahren.")
-    st.stop()
 
-# Liste der verfügbaren Nachrichtentypen
+
+# Liste der verfügbaren Fragetypen
 MESSAGE_TYPES = [
     "single_choice",
     "multiple_choice1",
@@ -228,6 +283,10 @@ def transform_output(json_string):
 
 def get_chatgpt_response(prompt, image=None, selected_language="English"):
     """Ruft eine Antwort von OpenAI GPT mit Fehlerbehandlung ab."""
+    if not client:
+        st.error("Kein gültiger OpenAI-API-Schlüssel vorhanden. Bitte geben Sie Ihren API-Schlüssel ein.")
+        return None
+
     try:
         # System-Prompt erstellen, der Sprachinstruktionen enthält
         system_prompt = (
@@ -278,7 +337,7 @@ def get_chatgpt_response(prompt, image=None, selected_language="English"):
             ]
 
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4",
             messages=messages,
             max_tokens=4000,
             temperature=0.6
@@ -311,6 +370,10 @@ def process_images(images, selected_language):
 
 def generate_questions_with_image(user_input, learning_goals, selected_types, image, selected_language):
     """Generiert Fragen für das Bild und behandelt Fehler."""
+    if not client:
+        st.error("Ein gültiger OpenAI-API-Schlüssel ist erforderlich, um Fragen zu generieren.")
+        return
+
     all_responses = ""
     generated_content = {}
     for msg_type in selected_types:
@@ -526,7 +589,9 @@ def main():
     
         # Button zum Generieren von Fragen
         if st.button("Fragen generieren"):
-            if (user_input or image_content) and selected_types:
+            if not client:
+                st.error("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein, um Fragen zu generieren.")
+            elif (user_input or image_content) and selected_types:
                 # Übergabe der ausgewählten Sprache zur Funktion
                 generate_questions_with_image(user_input, learning_goals, selected_types, image_content, selected_language)              
             elif not user_input and not image_content:
