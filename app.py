@@ -527,64 +527,6 @@ def main():
             </style>
             """, unsafe_allow_html=True
         )
-        
-        # Kosteninformationen mit benutzerdefiniertem Info-Callout-Stil
-        st.markdown('''
-        <div class="custom-info">
-            <strong>ℹ️ Kosteninformationen:</strong>
-            <ul>
-                <li>Die Nutzungskosten hängen von der <strong>Länge der Eingabe</strong> ab (zwischen 0,01 $ und 0,1 $).</li>
-                <li>Jeder ausgewählte Fragetyp kostet ungefähr 0,01 $.</li>
-            </ul>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        # Fragetypen mit Erfolg-Stil
-        st.markdown('''
-        <div class="custom-success">
-            <strong>✅ Multiple-Choice-Fragen:</strong>
-            <ul>
-                <li>Alle Multiple-Choice-Fragen haben maximal 3 Punkte.</li>
-                <li><strong>multiple_choice1</strong>: 1 von 4 richtigen Antworten.</li>
-                <li><strong>multiple_choice2</strong>: 2 von 4 richtigen Antworten.</li>
-                <li><strong>multiple_choice3</strong>: 3 von 4 richtigen Antworten.</li>
-            </ul>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        st.markdown('''
-        <div class="custom-success">
-            <strong>✅ Inline/FIB-Fragen:</strong>
-            <ul>
-                <li>Die <strong>Inline</strong> und <strong>FIB</strong> Fragen sind inhaltlich identisch.</li>
-                <li>FIB = fehlendes Wort eingeben.</li>
-                <li>Inline = fehlendes Wort auswählen.</li>
-            </ul>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        st.markdown('''
-        <div class="custom-success">
-            <strong>✅ Andere Fragetypen:</strong>
-            <ul>
-                <li><strong>Single Choice</strong>: 4 Antworten, 1 Punkt pro Frage.</li>
-                <li><strong>KPRIM</strong>: 4 Antworten, 5 Punkte (4/4 korrekt), 2,5 Punkte (3/4 korrekt), 0 Punkte (50% oder weniger korrekt).</li>
-                <li><strong>True/False</strong>: 3 Antworten, 3 Punkte pro Frage.</li>
-                <li><strong>Drag & Drop</strong>: Variable Punkte.</li>
-            </ul>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        # Warnungen mit benutzerdefiniertem Warnungs-Stil
-        st.markdown('''
-        <div class="custom-warning">
-            <strong>⚠️ Warnungen:</strong>
-            <ul>
-                <li><strong>Überprüfen Sie immer, dass die Gesamtpunkte = Summe der Punkte der korrekten Antworten sind.</strong></li>
-                <li><strong>Überprüfen Sie immer den Inhalt der Antworten.</strong></li>
-            </ul>
-        </div>
-        ''', unsafe_allow_html=True)
 
     
         # Button zum Generieren von Fragen
