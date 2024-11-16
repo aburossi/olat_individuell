@@ -35,7 +35,7 @@ with st.sidebar:
     
     # YouTube-Video in die Seitenleiste einbetten
     components.html("""
-        <iframe width="100%" height="180" src="https://www.youtube.com/embed/OB99E7Y1cMA" 
+        <iframe width="100%" height="180" src="https://www.youtube.com/embed/NsTAjBdHb1k" 
         title="Demo-Video auf Deutsch" frameborder="0" allow="accelerometer; autoplay; 
         clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen>
         </iframe>
