@@ -23,7 +23,7 @@ st.set_page_config(
 )
 
 # Titel der App
-st.title("📝 OLAT Fragen Generator")
+st.title("📝 Fragen Generator")
 
 # Seitenleiste für Anweisungen und Zusatzinformationen
 with st.sidebar:
