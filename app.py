@@ -310,18 +310,15 @@ def get_chatgpt_response(prompt, image=None, selected_language="English"):
 
             **Input-Analyse:**
 
-            - Für Text-Uploads analysierst du den Inhalt sorgfältig, um die Schlüsselkonzepte und wichtigen Informationen zu verstehen.
-            - Für Bild-Uploads interpretierst und extrahierst du relevante Informationen (z.B. Diagramme, Grafiken, Bilder oder Infografiken), um Bildungsinhalte abzuleiten.
+            - Du analysierst du den Inhalt sorgfältig, um die Schlüsselkonzepte und wichtigen Informationen zu verstehen.
+            - Falls vorhanden, du achtest auf Diagramme, Grafiken, Bilder oder Infografiken, um Bildungsinhalte abzuleiten.
 
             **Fragen-Generierung nach Bloom-Ebene:**
-            Basierend auf dem analysierten Material (aus Text oder Bild) generierst du Fragen über alle sechs Ebenen der Bloom's Taxonomy:
+            Basierend auf dem analysierten Material generierst du Fragen über alle die folgenden Ebenen der Bloom's Taxonomy:
 
             - **Erinnern**: Einfache, abrufbasierte Fragen.
             - **Verstehen**: Fragen, die das Verständnis des Materials bewerten.
             - **Anwenden**: Fragen, die die Anwendung des Wissens in praktischen Situationen erfordern.
-            - **Analysieren**: Fragen, die das Zerlegen des Materials und die Untersuchung von Zusammenhängen beinhalten.
-            - **Bewerten**: Kritisches Denkfragen, die Urteile oder Bewertungen erfordern.
-            - **Erstellen**: Offene Aufgaben, die den Schüler dazu auffordern, etwas zu entwerfen oder zu konstruieren basierend auf den bereitgestellten Informationen.
             """
         )
         
