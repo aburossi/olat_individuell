@@ -11,6 +11,8 @@ import io
 from PIL import Image
 import logging
 import streamlit.components.v1 as components
+import httpx
+import os
 
 # Logging für bessere Fehlerverfolgung einrichten
 logging.basicConfig(level=logging.INFO)
@@ -125,15 +127,26 @@ with st.sidebar:
 st.header("🔑 Geben Sie Ihren OpenAI-API-Schlüssel ein")
 api_key = st.text_input("OpenAI-API-Schlüssel:", type="password")
 
+# Clear any existing proxy environment variables to prevent OpenAI SDK from using them
+os.environ.pop('HTTP_PROXY', None)
+os.environ.pop('HTTPS_PROXY', None)
+os.environ.pop('http_proxy', None)
+os.environ.pop('https_proxy', None)
+
+# Initialize a custom httpx client without proxies
+http_client = httpx.Client()
+
 # Initialize OpenAI client if an API key is provided
 client = None
 if api_key:
     try:
-        client = OpenAI(api_key=api_key)
+        client = OpenAI(
+            api_key=api_key,
+            http_client=http_client
+        )
         st.success("API-Schlüssel erfolgreich erkannt und verbunden.")
     except Exception as e:
         st.error(f"Fehler bei der Initialisierung des OpenAI-Clients: {e}")
-
 
 # Liste der verfügbaren Fragetypen
 MESSAGE_TYPES = [
@@ -317,7 +330,7 @@ def get_chatgpt_response(prompt, image=None, selected_language="English"):
             messages = [
                 {"role": "system", "content": system_prompt},
                 {
-                    "role": "user",
+                    "role": "user", 
                     "content": [
                         {"type": "text", "text": prompt},
                         {
