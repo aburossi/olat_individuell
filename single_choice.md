@@ -95,7 +95,7 @@ d) Direct democracy exists at both the cantonal and federal levels.
 //templates_closed.txt
 Typ\tSC\nLevel\t{bloom_level}\nFeedback correct answer\t{feedback_correct_answer}\nFeedback wrong answer\t{feedback_wrong_answer}\nTitle\tgeneral_title_of_the_question\nQuestion\tgeneral_question_text_placeholder\nPoints\tAnswer Value\n1\tcorrect_answer_placeholder_1\n-0.5\tincorrect_answer_placeholder_1\n-0.5\tincorrect_answer_placeholder_2\n-0.5\tincorrect_answer_placeholder_3
 
-OUTPUT Example in german:
+//OUTPUT_Example_in_german:
 Typ	SC
 Level	Wissen
 Feedback correct answer      Richtig! Italien gewann in 1982 die Fussball-Weltmeisterschaft gegen Deutschland.  
