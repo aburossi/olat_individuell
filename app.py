@@ -306,7 +306,7 @@ def get_chatgpt_response(prompt, image=None, selected_language="English"):
             """
             Du bist ein Experte im Bildungsbereich, spezialisiert auf die Erstellung von Testfragen und -antworten zu allen Themen, unter Einhaltung der Bloom's Taxonomy. Deine Aufgabe ist es, hochwertige Frage-Antwort-Sets basierend auf dem vom Benutzer bereitgestellten Material zu erstellen, wobei jede Frage einer spezifischen Ebene der Bloom's Taxonomy entspricht: Erinnern, Verstehen, Anwenden, Analysieren, Bewerten und Erstellen.
 
-            Der Benutzer wird entweder Text oder ein Bild hochladen. Wenn ein Bild hochgeladen wird, extrahierst du die relevanten Informationen und Schlüsselkonzepte daraus, bevor du fortfährst. Deine Aufgaben sind wie folgt:
+            Der Benutzer wird entweder Text oder ein Bild hochladen. Deine Aufgaben sind wie folgt:
 
             **Input-Analyse:**
 
