@@ -171,7 +171,7 @@ if api_key:
     except Exception as e:
         st.error(f"Fehler bei der Initialisierung des OpenAI-Clients: {e}")
 
-# Liste der verfügbaren Fragetypen
+# Liste der verfügbaren Fragetypen (global)
 MESSAGE_TYPES = [
     "single_choice",
     "multiple_choice1",
@@ -342,6 +342,9 @@ def get_chatgpt_response(prompt, model, image=None, selected_language="English")
             - **Erinnern**: Einfache, abrufbasierte Fragen.
             - **Verstehen**: Fragen, die das Verständnis des Materials bewerten.
             - **Anwenden**: Fragen, die die Anwendung des Wissens in praktischen Situationen erfordern.
+            - **Analysieren**: Fragen, die die Fähigkeit zur Analyse des Materials testen.
+            - **Bewerten**: Fragen, die die Bewertung von Informationen oder Ideen verlangen.
+            - **Erstellen**: Fragen, die die Erstellung neuer Inhalte oder Konzepte erfordern.
             """
         )
         
@@ -382,22 +385,33 @@ def get_chatgpt_response(prompt, model, image=None, selected_language="English")
         logging.error(f"Fehler bei der Kommunikation mit der OpenAI API: {e}")
         return None
 
-def process_images(images, selected_language, selected_model):
+def process_images(images, selected_language, selected_model, general_user_input=None, general_learning_goals=None, use_global_settings=True, file_idx=1):
     """Verarbeitet hochgeladene Bilder und generiert Fragen."""
     for idx, image in enumerate(images):
         st.image(image, caption=f'Seite {idx+1}', use_column_width=True)
 
-        # Textbereich für Benutzereingaben und Lernziele
-        user_input = st.text_area(f"Geben Sie Ihre Frage oder Anweisungen für Seite {idx+1} ein:", key=f"text_area_{idx}")
-        learning_goals = st.text_area(f"Lernziele für Seite {idx+1} (Optional):", key=f"learning_goals_{idx}")
-        selected_types = st.multiselect(f"Wählen Sie die Fragetypen für Seite {idx+1} aus:", MESSAGE_TYPES, key=f"selected_types_{idx}")
+        if use_global_settings:
+            # Wenn globale Einstellungen verwendet werden, nutzen wir die allgemeinen Eingaben
+            user_input = general_user_input
+            learning_goals = general_learning_goals
+        else:
+            # Textbereich für Benutzereingaben und Lernziele individuell
+            user_input = st.text_area(f"Geben Sie Ihre Frage oder Anweisungen für Seite {idx+1} ein:", key=f"text_area_{file_idx}_{idx}")
+            learning_goals = st.text_area(f"Lernziele für Seite {idx+1} (Optional):", key=f"learning_goals_{file_idx}_{idx}")
+        
+        if use_global_settings:
+            # Keine individuelle Fragetyp-Auswahl, da sie global ausgewählt wurde
+            selected_types = st.session_state.global_selected_types
+        else:
+            # Fragetypen auswählen individuell
+            selected_types = st.multiselect(f"Wählen Sie die Fragetypen für Seite {idx+1} aus:", MESSAGE_TYPES, key=f"selected_types_{file_idx}_{idx}")
 
         # Button zum Generieren von Fragen für die Seite
-        if st.button(f"Fragen für Seite {idx+1} generieren", key=f"generate_button_{idx}"):
+        if st.button(f"Fragen für Seite {idx+1} generieren", key=f"generate_button_{file_idx}_{idx}"):
             # Fragen nur generieren, wenn Benutzereingaben und ausgewählte Fragetypen vorhanden sind
             if user_input and selected_types:
                 # Übergabe der ausgewählten Sprache und des Modells hier
-                generate_questions_with_image(user_input, learning_goals, selected_types, image, selected_language, selected_model, file_idx=idx+1)
+                generate_questions_with_image(user_input, learning_goals, selected_types, image, selected_language, selected_model, file_idx=file_idx)
             else:
                 st.warning(f"Bitte geben Sie Text ein und wählen Sie Fragetypen für Seite {idx+1} aus.")
 
@@ -502,12 +516,36 @@ def main():
     }
     selected_language = st.radio("Wählen Sie die Sprache für die Ausgabe:", list(languages.keys()), index=0)
 
+    # Auswahl zwischen globalen oder individuellen Einstellungen
+    st.subheader("Einstellungen für Fragen und Lernziele auswählen:")
+    settings_option = st.radio(
+        "Möchten Sie allgemeine Fragen und Lernziele für alle Dateien verwenden oder für jede Datei individuell?",
+        ("Allgemeine Einstellungen für alle Dateien", "Individuelle Einstellungen pro Datei")
+    )
+
+    if settings_option == "Allgemeine Einstellungen für alle Dateien":
+        use_global_settings = True
+        st.markdown("### **Allgemeine Fragen und Lernziele für alle Dateien**")
+        general_user_input = st.text_area("Allgemeine Fragen oder Anweisungen:", key="general_user_input")
+        general_learning_goals = st.text_area("Allgemeine Lernziele (Optional):", key="general_learning_goals")
+        # Fragetypen auswählen global und speichern in session state
+        st.session_state.global_selected_types = st.multiselect("Wählen Sie die Fragetypen zur Generierung aus:", MESSAGE_TYPES, key="global_selected_types")
+    else:
+        use_global_settings = False
+        general_user_input = None
+        general_learning_goals = None
+
     # Dateiuploader-Bereich mit Mehrfachauswahl
-    uploaded_files = st.file_uploader("Laden Sie eine oder mehrere PDF, DOCX oder Bilddateien hoch", type=["pdf", "docx", "jpg", "jpeg", "png"], accept_multiple_files=True)
+    uploaded_files = st.file_uploader(
+        "Laden Sie eine oder mehrere PDF, DOCX oder Bilddateien hoch", 
+        type=["pdf", "docx", "jpg", "jpeg", "png"], 
+        accept_multiple_files=True
+    )
 
     if uploaded_files:
         for idx, uploaded_file in enumerate(uploaded_files):
-            st.markdown(f"### Datei {idx+1}: {uploaded_file.name}")
+            file_idx = idx + 1
+            st.markdown(f"### Datei {file_idx}: {uploaded_file.name}")
             if uploaded_file.type == "application/pdf":
                 text_content, images = process_pdf(uploaded_file)
                 if text_content:
@@ -519,75 +557,136 @@ def main():
                 st.success(f"Text aus DOCX '{uploaded_file.name}' erfolgreich extrahiert. Sie können ihn nun im folgenden Textbereich bearbeiten.")
             elif uploaded_file.type.startswith('image/'):
                 image_content = Image.open(uploaded_file)
-                st.image(image_content, caption=f'Hochgeladenes Bild {idx+1}: {uploaded_file.name}', use_column_width=True)
+                st.image(image_content, caption=f'Hochgeladenes Bild {file_idx}: {uploaded_file.name}', use_column_width=True)
                 st.success(f"Bild '{uploaded_file.name}' erfolgreich hochgeladen. Sie können jetzt Fragen zum Bild stellen.")
             else:
                 st.error(f"Nicht unterstützter Dateityp für '{uploaded_file.name}'. Bitte laden Sie eine PDF, DOCX oder Bilddatei hoch.")
 
             # Verarbeitung je nach Dateityp
             if uploaded_file.type == "application/pdf" and text_content:
-                # Benutzerdefinierte CSS für hellblauen Hintergrund in Info-Callouts
-                st.markdown(
-                    """
-                    <style>
-                    .custom-info {
-                        background-color: #e7f3fe;
-                        padding: 10px;
-                        border-radius: 5px;
-                        border-left: 6px solid #2196F3;
-                    }
-                    .custom-success {
-                        background-color: #d4edda;
-                        padding: 10px;
-                        border-radius: 5px;
-                        border-left: 6px solid #28a745;
-                    }
-                    .custom-warning {
-                        background-color: #fff3cd;
-                        padding: 10px;
-                        border-radius: 5px;
-                        border-left: 6px solid #ffc107;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True
-                )
+                if use_global_settings:
+                    # Benutzerdefinierte CSS für hellblauen Hintergrund in Info-Callouts
+                    st.markdown(
+                        """
+                        <style>
+                        .custom-info {
+                            background-color: #e7f3fe;
+                            padding: 10px;
+                            border-radius: 5px;
+                            border-left: 6px solid #2196F3;
+                        }
+                        .custom-success {
+                            background-color: #d4edda;
+                            padding: 10px;
+                            border-radius: 5px;
+                            border-left: 6px solid #28a745;
+                        }
+                        .custom-warning {
+                            background-color: #fff3cd;
+                            padding: 10px;
+                            border-radius: 5px;
+                            border-left: 6px solid #ffc107;
+                        }
+                        </style>
+                        """, unsafe_allow_html=True
+                    )
 
-                # Benutzerdefinierte Eingabefelder für Textinhalte
-                user_input = st.text_area(f"Geben Sie Ihren Text oder Ihre Frage für '{uploaded_file.name}' ein:", value=text_content, key=f"text_area_{idx}")
-                learning_goals = st.text_area(f"Lernziele für '{uploaded_file.name}' (Optional):", key=f"learning_goals_{idx}")
+                    # Benutzerdefinierte Eingabefelder für Textinhalte
+                    user_input = general_user_input
+                    learning_goals = general_learning_goals
+                    selected_types = st.session_state.global_selected_types
+
+                    # Button zum Generieren von Fragen
+                    if st.button(f"Fragen für '{uploaded_file.name}' generieren", key=f"generate_button_{file_idx}"):
+                        if not client:
+                            st.error("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein, um Fragen zu generieren.")
+                        elif user_input and selected_types:
+                            generate_questions_with_image(user_input, learning_goals, selected_types, None, selected_language, selected_model, file_idx=file_idx)
+                        else:
+                            st.warning(f"Bitte geben Sie Text ein und wählen Sie Fragetypen für '{uploaded_file.name}' aus.")
                 
-                # Fragetypen auswählen
-                selected_types = st.multiselect(f"Wählen Sie die Fragetypen zur Generierung für '{uploaded_file.name}' aus:", MESSAGE_TYPES, key=f"selected_types_{idx}")
-                
-                # Button zum Generieren von Fragen
-                if st.button(f"Fragen für '{uploaded_file.name}' generieren", key=f"generate_button_{idx}"):
-                    if not client:
-                        st.error("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein, um Fragen zu generieren.")
-                    elif (user_input) and selected_types:
-                        generate_questions_with_image(user_input, learning_goals, selected_types, None, selected_language, selected_model, file_idx=idx+1)
-                    else:
-                        st.warning(f"Bitte geben Sie Text ein und wählen Sie Fragetypen für '{uploaded_file.name}' aus.")
+                else:
+                    # Individuelle Einstellungen
+                    st.markdown(
+                        """
+                        <style>
+                        .custom-info {
+                            background-color: #e7f3fe;
+                            padding: 10px;
+                            border-radius: 5px;
+                            border-left: 6px solid #2196F3;
+                        }
+                        .custom-success {
+                            background-color: #d4edda;
+                            padding: 10px;
+                            border-radius: 5px;
+                            border-left: 6px solid #28a745;
+                        }
+                        .custom-warning {
+                            background-color: #fff3cd;
+                            padding: 10px;
+                            border-radius: 5px;
+                            border-left: 6px solid #ffc107;
+                        }
+                        </style>
+                        """, unsafe_allow_html=True
+                    )
+
+                    # Benutzerdefinierte Eingabefelder für Textinhalte
+                    user_input = st.text_area(f"Geben Sie Ihren Text oder Ihre Frage für '{uploaded_file.name}' ein:", value=text_content, key=f"text_area_{file_idx}")
+                    learning_goals = st.text_area(f"Lernziele für '{uploaded_file.name}' (Optional):", key=f"learning_goals_{file_idx}")
+                    
+                    # Fragetypen auswählen (global)
+                    selected_types = st.session_state.global_selected_types
+
+                    # Button zum Generieren von Fragen
+                    if st.button(f"Fragen für '{uploaded_file.name}' generieren", key=f"generate_button_{file_idx}"):
+                        if not client:
+                            st.error("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein, um Fragen zu generieren.")
+                        elif user_input and selected_types:
+                            generate_questions_with_image(user_input, learning_goals, selected_types, None, selected_language, selected_model, file_idx=file_idx)
+                        else:
+                            st.warning(f"Bitte geben Sie Text ein und wählen Sie Fragetypen für '{uploaded_file.name}' aus.")
             
             elif uploaded_file.type == "application/pdf" and images:
-                # Verarbeitung der Bilder aus PDF
-                process_images(images, selected_language, selected_model)
+                if use_global_settings:
+                    # Verwenden allgemeiner Einstellungen
+                    process_images(images, selected_language, selected_model, general_user_input, general_learning_goals, use_global_settings=True, file_idx=file_idx)
+                else:
+                    # Individuelle Einstellungen für jedes Bild
+                    for img_idx, image in enumerate(images):
+                        process_images([image], selected_language, selected_model, general_user_input=None, general_learning_goals=None, use_global_settings=False, file_idx=file_idx)
             
             elif uploaded_file.type.startswith('image/'):
-                # Textbereich für Bildinhalt
-                user_input = st.text_area(f"Geben Sie Ihren Text oder Ihre Frage für Bild '{uploaded_file.name}' ein:", key=f"text_area_image_{idx}")
-                learning_goals = st.text_area(f"Lernziele für Bild '{uploaded_file.name}' (Optional):", key=f"learning_goals_image_{idx}")
-                
-                # Fragetypen auswählen
-                selected_types = st.multiselect(f"Wählen Sie die Fragetypen zur Generierung für Bild '{uploaded_file.name}' aus:", MESSAGE_TYPES, key=f"selected_types_image_{idx}")
-                
-                # Button zum Generieren von Fragen
-                if st.button(f"Fragen für Bild '{uploaded_file.name}' generieren", key=f"generate_button_image_{idx}"):
-                    if not client:
-                        st.error("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein, um Fragen zu generieren.")
-                    elif (user_input or uploaded_file) and selected_types:
-                        generate_questions_with_image(user_input, learning_goals, selected_types, image_content, selected_language, selected_model, file_idx=idx+1)
-                    else:
-                        st.warning(f"Bitte geben Sie etwas Text ein und wählen Sie Fragetypen für Bild '{uploaded_file.name}' aus.")
+                if use_global_settings:
+                    user_input = general_user_input
+                    learning_goals = general_learning_goals
+                    selected_types = st.session_state.global_selected_types
+
+                    # Button zum Generieren von Fragen
+                    if st.button(f"Fragen für Bild '{uploaded_file.name}' generieren", key=f"generate_button_image_{file_idx}"):
+                        if not client:
+                            st.error("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein, um Fragen zu generieren.")
+                        elif user_input and selected_types:
+                            generate_questions_with_image(user_input, learning_goals, selected_types, image_content, selected_language, selected_model, file_idx=file_idx)
+                        else:
+                            st.warning(f"Bitte geben Sie Text ein und wählen Sie Fragetypen für Bild '{uploaded_file.name}' aus.")
+                else:
+                    # Individuelle Einstellungen
+                    user_input = st.text_area(f"Geben Sie Ihren Text oder Ihre Frage für Bild '{uploaded_file.name}' ein:", key=f"text_area_image_{file_idx}")
+                    learning_goals = st.text_area(f"Lernziele für Bild '{uploaded_file.name}' (Optional):", key=f"learning_goals_image_{file_idx}")
+                    
+                    # Fragetypen auswählen (global)
+                    selected_types = st.session_state.global_selected_types
+
+                    # Button zum Generieren von Fragen
+                    if st.button(f"Fragen für Bild '{uploaded_file.name}' generieren", key=f"generate_button_image_{file_idx}"):
+                        if not client:
+                            st.error("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein, um Fragen zu generieren.")
+                        elif user_input and selected_types:
+                            generate_questions_with_image(user_input, learning_goals, selected_types, image_content, selected_language, selected_model, file_idx=file_idx)
+                        else:
+                            st.warning(f"Bitte geben Sie etwas Text ein und wählen Sie Fragetypen für Bild '{uploaded_file.name}' aus.")
 
     else:
         st.info("Bitte laden Sie eine oder mehrere PDF, DOCX oder Bilddateien hoch, um mit der Generierung von Fragen zu beginnen.")
