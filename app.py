@@ -220,10 +220,8 @@ def replace_german_sharp_s(text):
 
 def clean_json_string(s):
     s = s.strip()
-    s = re.sub(r'^
-json\s*', '', s)
-    s = re.sub(r'\s*
-$', '', s)
+    s = re.sub(r'^json\s*', '', s)
+    s = re.sub(r'\s*$', '', s)
     s = re.sub(r'\s+', ' ', s)
     s = re.sub(r'(?<=text": ")(.+?)(?=")', lambda m: m.group(1).replace('\n', '\\n'), s)
     s = ''.join(char for char in s if ord(char) >= 32 or char == '\n')
