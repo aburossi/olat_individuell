@@ -187,8 +187,12 @@ MESSAGE_TYPES = [
 @st.cache_data
 def read_prompt_from_md(filename):
     """Liest den Prompt aus einer Markdown-Datei und speichert das Ergebnis zwischen."""
-    with open(f"{filename}.md", "r", encoding="utf-8") as file:
-        return file.read()
+    try:
+        with open(f"{filename}.md", "r", encoding="utf-8") as file:
+            return file.read()
+    except FileNotFoundError:
+        st.error(f"Die Prompt-Datei '{filename}.md' wurde nicht gefunden.")
+        return ""
 
 def process_image(_image):
     """Verarbeitet und verkleinert ein Bild, um den Speicherverbrauch zu reduzieren."""
@@ -218,6 +222,7 @@ def process_image(_image):
 def replace_german_sharp_s(text):
     """Ersetzt alle Vorkommen von 'ß' durch 'ss'."""
     return text.replace('ß', 'ss')
+
 
 def clean_json_string(s):
     s = s.strip()
@@ -478,19 +483,33 @@ def generate_all_questions(uploaded_files, general_user_input, general_learning_
 
 def generate_questions_for_content(text, user_input, learning_goals, selected_types, selected_language, selected_model, image=None):
     """Generiert Fragen basierend auf dem bereitgestellten Inhalt oder Bild."""
-    if image:
-        response = get_chatgpt_response(user_input, selected_model, image=image, selected_language=selected_language)
-    else:
-        response = get_chatgpt_response(user_input, selected_model, image=None, selected_language=selected_language)
+    all_responses = ""
+    generated_content = {}
+    for msg_type in selected_types:
+        prompt_template = read_prompt_from_md(msg_type)
+        if not prompt_template:
+            continue  # Überspringen, wenn keine Prompt-Datei gefunden wurde
 
-    if response:
-        if "inline_fib" in selected_types:
-            processed_response = transform_output(response)
-            return processed_response
+        # Kombination des Prompt-Templates mit Benutzerinput und Lernzielen
+        full_prompt = f"{prompt_template}\n\nBenutzereingabe: {user_input}\n\nLernziele: {learning_goals}"
+        
+        response = get_chatgpt_response(full_prompt, model=selected_model, image=image, selected_language=selected_language)
+        
+        if response:
+            if msg_type == "inline_fib":
+                processed_response = transform_output(response)
+                generated_content[f"{msg_type.replace('_', ' ').title()} (Verarbeitet)"] = processed_response
+                all_responses += f"{processed_response}\n\n"
+            else:
+                generated_content[msg_type.replace('_', ' ').title()] = response
+                all_responses += f"{response}\n\n"
         else:
-            return response
-    else:
-        return "Fehler bei der Generierung der Fragen."
+            st.error(f"Fehler bei der Generierung einer Antwort für {msg_type}.")
+
+    # Reinigungsfunktion auf alle Antworten anwenden
+    all_responses = replace_german_sharp_s(all_responses)
+
+    return all_responses
 
 def main():
     """Hauptfunktion für die Streamlit-App."""
@@ -515,10 +534,19 @@ def main():
         st.markdown("### **Wählen Sie die Fragetypen zur Generierung aus:**")
         selected_types = st.multiselect("Fragetypen:", MESSAGE_TYPES, key="global_selected_types")
     else:
+        # Individuelle Einstellungen wurden entfernt, wie vom Benutzer gewünscht
+        st.warning("Die individuellen Einstellungen pro Datei wurden entfernt. Nur allgemeine Einstellungen sind verfügbar.")
         use_global_settings = False
-        general_user_input = None
-        general_learning_goals = None
-        selected_types = []  # Wird pro Datei ausgewählt
+        general_user_input = st.text_area("Allgemeine Fragen oder Anweisungen:", key="general_user_input")
+        general_learning_goals = st.text_area("Allgemeine Lernziele (Optional):", key="general_learning_goals")
+        
+        # Initialisierung der global_selected_types in session_state, falls nicht vorhanden
+        if 'global_selected_types' not in st.session_state:
+            st.session_state.global_selected_types = []
+        
+        # Fragetypen auswählen global
+        st.markdown("### **Wählen Sie die Fragetypen zur Generierung aus:**")
+        selected_types = st.multiselect("Fragetypen:", MESSAGE_TYPES, key="global_selected_types")
 
     # Modellenauswahl mit Dropdown
     st.subheader("Modell für die Generierung auswählen:")
@@ -565,6 +593,7 @@ def main():
                     st.error(f"Nicht unterstützter Dateityp für '{uploaded_file.name}'. Bitte laden Sie eine PDF, DOCX oder Bilddatei hoch.")
 
         # Button zum Generieren von Fragen für alle Dateien
+        st.markdown("---")
         if st.button("📥 Fragen generieren für alle Dateien"):
             with st.spinner("Generiere Fragen..."):
                 zip_buffer = generate_all_questions(
@@ -586,7 +615,6 @@ def main():
                         )
                     else:
                         # Einzelne Datei: Download der einzelnen Textdatei
-                        # Extrahiere die Textdatei aus dem ZIP
                         with zipfile.ZipFile(zip_buffer, 'r') as zip_ref:
                             for file in zip_ref.namelist():
                                 extracted_file = zip_ref.read(file)
