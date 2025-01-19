@@ -17,11 +17,33 @@ import os
 # Logging für bessere Fehlerverfolgung einrichten
 logging.basicConfig(level=logging.INFO)
 
-# Seitenkonfiguration festlegen
+# Seitenkonfiguration festlegen und Light Mode erzwingen
 st.set_page_config(
     page_title="📝 OLAT Fragen Generator",
     layout="wide",
     initial_sidebar_state="expanded",
+)
+
+# Enforce Light Mode using CSS
+st.markdown(
+    """
+    <style>
+    /* Force light mode */
+    body, .css-18e3th9, .css-1d391kg {
+        background-color: white;
+        color: black;
+    }
+    /* Override Streamlit's default dark mode elements */
+    .css-1aumxhk, .css-1v3fvcr {
+        background-color: white;
+    }
+    /* Ensure all text is dark */
+    .css-1v0mbdj, .css-1xarl3l {
+        color: black;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
 # Titel der App
@@ -51,7 +73,7 @@ with st.sidebar:
     5. **Fragen generieren**: Klicken Sie auf die Schaltfläche "Fragen generieren", um den Prozess zu starten.
     6. **Generierte Inhalte herunterladen**: Nach der Generierung können Sie die Antworten herunterladen.
     """)
-
+    
     # Kosteninformationen und Frage-Erklärungen
     st.markdown('''
     <div class="custom-info">
@@ -294,7 +316,7 @@ def transform_output(json_string):
         st.code(json_string)
         return "Fehler: Eingabe konnte nicht verarbeitet werden"
 
-def get_chatgpt_response(prompt, image=None, selected_language="English"):
+def get_chatgpt_response(prompt, model, image=None, selected_language="English"):
     """Ruft eine Antwort von OpenAI GPT mit Fehlerbehandlung ab."""
     if not client:
         st.error("Kein gültiger OpenAI-API-Schlüssel vorhanden. Bitte geben Sie Ihren API-Schlüssel ein.")
@@ -347,9 +369,9 @@ def get_chatgpt_response(prompt, image=None, selected_language="English"):
             ]
 
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model=model,
             messages=messages,
-            max_tokens=8000,
+            max_tokens=15000,  # Updated max tokens
             temperature=0.6
         )
         
@@ -359,7 +381,7 @@ def get_chatgpt_response(prompt, image=None, selected_language="English"):
         logging.error(f"Fehler bei der Kommunikation mit der OpenAI API: {e}")
         return None
 
-def process_images(images, selected_language):
+def process_images(images, selected_language, selected_model):
     """Verarbeitet hochgeladene Bilder und generiert Fragen."""
     for idx, image in enumerate(images):
         st.image(image, caption=f'Seite {idx+1}', use_column_width=True)
@@ -373,12 +395,12 @@ def process_images(images, selected_language):
         if st.button(f"Fragen für Seite {idx+1} generieren", key=f"generate_button_{idx}"):
             # Fragen nur generieren, wenn Benutzereingaben und ausgewählte Fragetypen vorhanden sind
             if user_input and selected_types:
-                # Übergabe der ausgewählten Sprache hier
-                generate_questions_with_image(user_input, learning_goals, selected_types, image, selected_language)
+                # Übergabe der ausgewählten Sprache und des Modells hier
+                generate_questions_with_image(user_input, learning_goals, selected_types, image, selected_language, selected_model)
             else:
                 st.warning(f"Bitte geben Sie Text ein und wählen Sie Fragetypen für Seite {idx+1} aus.")
 
-def generate_questions_with_image(user_input, learning_goals, selected_types, image, selected_language):
+def generate_questions_with_image(user_input, learning_goals, selected_types, image, selected_language, selected_model):
     """Generiert Fragen für das Bild und behandelt Fehler."""
     if not client:
         st.error("Ein gültiger OpenAI-API-Schlüssel ist erforderlich, um Fragen zu generieren.")
@@ -390,7 +412,7 @@ def generate_questions_with_image(user_input, learning_goals, selected_types, im
         prompt_template = read_prompt_from_md(msg_type)
         full_prompt = f"{prompt_template}\n\nBenutzereingabe: {user_input}\n\nLernziele: {learning_goals}"
         try:
-            response = get_chatgpt_response(full_prompt, image=image, selected_language=selected_language)
+            response = get_chatgpt_response(full_prompt, model=selected_model, image=image, selected_language=selected_language)
             if response:
                 if msg_type == "inline_fib":
                     processed_response = transform_output(response)
@@ -462,6 +484,11 @@ def process_pdf(file):
 
 def main():
     """Hauptfunktion für die Streamlit-App."""
+    # Modellenauswahl mit Dropdown
+    st.subheader("Modell für die Generierung auswählen:")
+    model_options = ["gpt-4o", "gpt-4o-mini"]
+    selected_model = st.selectbox("Wählen Sie das Modell aus:", model_options, index=0)
+
     # Sprachenauswahl mit Radiobuttons
     st.subheader("Sprache für generierte Fragen auswählen:")
     languages = {
@@ -486,11 +513,10 @@ def main():
 
     if uploaded_file is not None:
         if uploaded_file.type == "application/pdf":
-            text_content = extract_text_from_pdf(uploaded_file)
+            text_content, images = process_pdf(uploaded_file)
             if text_content:
                 st.success("Text aus PDF extrahiert. Sie können ihn nun im folgenden Textfeld bearbeiten. PDFs, die länger als 5 Seiten sind, sollten gekürzt werden.")
-            else:
-                images = convert_pdf_to_images(uploaded_file)
+            elif images:
                 st.success("PDF in Bilder konvertiert. Sie können jetzt Fragen zu jeder Seite stellen.")
         elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
             text_content = extract_text_from_docx(uploaded_file)
@@ -504,7 +530,7 @@ def main():
 
     # Bilder verarbeiten, falls vorhanden, ansonsten Text oder Bildinhalt verarbeiten
     if images:
-        process_images(images, selected_language)  # Übergabe der ausgewählten Sprache hier
+        process_images(images, selected_language, selected_model)  # Übergabe der ausgewählten Sprache und des Modells hier
     else:
         user_input = st.text_area("Geben Sie Ihren Text oder Ihre Frage zum Bild ein:", value=text_content)
         learning_goals = st.text_area("Lernziele (Optional):")
@@ -544,8 +570,8 @@ def main():
             if not client:
                 st.error("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein, um Fragen zu generieren.")
             elif (user_input or image_content) and selected_types:
-                # Übergabe der ausgewählten Sprache zur Funktion
-                generate_questions_with_image(user_input, learning_goals, selected_types, image_content, selected_language)              
+                # Übergabe der ausgewählten Sprache und des Modells zur Funktion
+                generate_questions_with_image(user_input, learning_goals, selected_types, image_content, selected_language, selected_model)              
             elif not user_input and not image_content:
                 st.warning("Bitte geben Sie etwas Text ein, laden Sie eine Datei hoch oder laden Sie ein Bild hoch.")
             elif not selected_types:
