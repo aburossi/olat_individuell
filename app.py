@@ -18,33 +18,11 @@ import zipfile
 # Logging für bessere Fehlerverfolgung einrichten
 logging.basicConfig(level=logging.INFO)
 
-# Seitenkonfiguration festlegen und Light Mode erzwingen (Optional)
+# Seitenkonfiguration festlegen
 st.set_page_config(
     page_title="📝 OLAT Fragen Generator",
     layout="wide",
     initial_sidebar_state="expanded",
-)
-
-# Optional: Enforce Light Mode using CSS (can be removed if not necessary)
-st.markdown(
-    """
-    <style>
-    /* Force light mode */
-    body, .css-18e3th9, .css-1d391kg {
-        background-color: white;
-        color: black;
-    }
-    /* Override Streamlit's default dark mode elements */
-    .css-1aumxhk, .css-1v3fvcr {
-        background-color: white;
-    }
-    /* Ensure all text is dark */
-    .css-1v0mbdj, .css-1xarl3l {
-        color: black;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
 )
 
 # Titel der App
@@ -322,7 +300,7 @@ def transform_output(json_string):
         st.code(json_string)
         return "Fehler: Eingabe konnte nicht verarbeitet werden"
 
-def get_chatgpt_response(prompt, model, image=None, selected_language="English"):
+def get_chatgpt_response(prompt, image=None, selected_language="English", model="gpt-4o"):
     """Ruft eine Antwort von OpenAI GPT mit Fehlerbehandlung ab."""
     if not client:
         st.error("Kein gültiger OpenAI-API-Schlüssel vorhanden. Bitte geben Sie Ihren API-Schlüssel ein.")
@@ -347,9 +325,6 @@ def get_chatgpt_response(prompt, model, image=None, selected_language="English")
             - **Erinnern**: Einfache, abrufbasierte Fragen.
             - **Verstehen**: Fragen, die das Verständnis des Materials bewerten.
             - **Anwenden**: Fragen, die die Anwendung des Wissens in praktischen Situationen erfordern.
-            - **Analysieren**: Fragen, die die Fähigkeit zur Analyse des Materials testen.
-            - **Bewerten**: Fragen, die die Bewertung von Informationen oder Ideen verlangen.
-            - **Erstellen**: Fragen, die die Erstellung neuer Inhalte oder Konzepte erfordern.
             """
         )
         
@@ -442,7 +417,12 @@ def generate_questions_for_content(text, user_input, learning_goals, selected_ty
         # Kombination des Prompt-Templates mit Benutzerinput und Lernzielen
         full_prompt = f"{prompt_template}\n\nBenutzereingabe: {user_input}\n\nLernziele: {learning_goals}"
         
-        response = get_chatgpt_response(full_prompt, model=selected_model, image=image, selected_language=selected_language)
+        response = get_chatgpt_response(
+            prompt=full_prompt,
+            image=image,
+            selected_language=selected_language,
+            model=selected_model
+        )
         
         if response:
             if msg_type == "inline_fib":
@@ -540,57 +520,6 @@ def generate_all_questions(uploaded_files, general_user_input, general_learning_
 
     zip_buffer.seek(0)
     return zip_buffer
-
-def generate_questions_with_image(user_input, learning_goals, selected_types, image, selected_language, selected_model):
-    """Generiert Fragen für das Bild und behandelt Fehler."""
-    if not client:
-        st.error("Ein gültiger OpenAI-API-Schlüssel ist erforderlich, um Fragen zu generieren.")
-        return
-
-    all_responses = ""
-    generated_content = {}
-    for msg_type in selected_types:
-        prompt_template = read_prompt_from_md(msg_type)
-        if not prompt_template:
-            continue  # Überspringen, wenn keine Prompt-Datei gefunden wurde
-
-        full_prompt = f"{prompt_template}\n\nBenutzereingabe: {user_input}\n\nLernziele: {learning_goals}"
-        try:
-            response = get_chatgpt_response(
-                prompt=full_prompt,
-                model=selected_model,
-                image=image,
-                selected_language=selected_language
-            )
-            if response:
-                if msg_type == "inline_fib":
-                    processed_response = transform_output(response)
-                    generated_content[f"{msg_type.replace('_', ' ').title()} (Verarbeitet)"] = processed_response
-                    all_responses += f"{processed_response}\n\n"
-                else:
-                    generated_content[msg_type.replace('_', ' ').title()] = response
-                    all_responses += f"{response}\n\n"
-            else:
-                st.error(f"Fehler bei der Generierung einer Antwort für {msg_type}.")
-        except Exception as e:
-            st.error(f"Ein Fehler ist für {msg_type} aufgetreten: {str(e)}")
-    
-    # Reinigungsfunktion auf alle Antworten anwenden
-    all_responses = replace_german_sharp_s(all_responses)
-
-    # Generierten Inhalt mit Häkchen anzeigen
-    st.subheader("Generierter Inhalt:")
-    for title in generated_content.keys():
-        st.write(f"✔ {title}")
-
-    # Download-Button für alle Antworten
-    if all_responses:
-        st.download_button(
-            label="Alle Antworten herunterladen",
-            data=all_responses,
-            file_name="alle_antworten.txt",
-            mime="text/plain"
-        )
 
 def main():
     """Hauptfunktion für die Streamlit-App."""
@@ -800,13 +729,24 @@ def main():
                 if st.button(f"Fragen für Seite {idx+1} generieren", key=f"generate_button_{idx}"):
                     # Fragen nur generieren, wenn Benutzereingaben und ausgewählte Fragetypen vorhanden sind
                     if user_input and selected_types_page:
-                        generate_questions_with_image(
+                        questions = generate_questions_for_content(
+                            text="",
                             user_input=user_input,
                             learning_goals=learning_goals_page,
                             selected_types=selected_types_page,
-                            image=image,
                             selected_language=selected_language,
-                            selected_model=selected_model
+                            selected_model=selected_model,
+                            image=image
+                        )
+                        # Anzeigen der generierten Fragen
+                        st.subheader("Generierter Inhalt:")
+                        st.write(questions)
+                        # Download-Button
+                        st.download_button(
+                            label="Generierte Fragen herunterladen",
+                            data=questions,
+                            file_name=f"seite_{idx+1}_olat.txt",
+                            mime="text/plain"
                         )
                     else:
                         st.warning(f"Bitte geben Sie Text ein und wählen Sie Fragetypen für Seite {idx+1} aus.")
