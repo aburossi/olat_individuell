@@ -528,12 +528,18 @@ def main():
         st.markdown("### **Allgemeine Fragen und Lernziele für alle Dateien**")
         general_user_input = st.text_area("Allgemeine Fragen oder Anweisungen:", key="general_user_input")
         general_learning_goals = st.text_area("Allgemeine Lernziele (Optional):", key="general_learning_goals")
-        # Fragetypen auswählen global und speichern in session state
-        st.session_state.global_selected_types = st.multiselect("Wählen Sie die Fragetypen zur Generierung aus:", MESSAGE_TYPES, key="global_selected_types")
+        
+        # Initialisierung der global_selected_types in session_state, falls nicht vorhanden
+        if 'global_selected_types' not in st.session_state:
+            st.session_state.global_selected_types = []
+        
+        # Fragetypen auswählen global
+        selected_types = st.multiselect("Wählen Sie die Fragetypen zur Generierung aus:", MESSAGE_TYPES, key="global_selected_types")
     else:
         use_global_settings = False
         general_user_input = None
         general_learning_goals = None
+        selected_types = []
 
     # Dateiuploader-Bereich mit Mehrfachauswahl
     uploaded_files = st.file_uploader(
@@ -594,7 +600,7 @@ def main():
                     # Benutzerdefinierte Eingabefelder für Textinhalte
                     user_input = general_user_input
                     learning_goals = general_learning_goals
-                    selected_types = st.session_state.global_selected_types
+                    # selected_types bereits global ausgewählt
 
                     # Button zum Generieren von Fragen
                     if st.button(f"Fragen für '{uploaded_file.name}' generieren", key=f"generate_button_{file_idx}"):
@@ -637,7 +643,7 @@ def main():
                     learning_goals = st.text_area(f"Lernziele für '{uploaded_file.name}' (Optional):", key=f"learning_goals_{file_idx}")
                     
                     # Fragetypen auswählen (global)
-                    selected_types = st.session_state.global_selected_types
+                    # selected_types bereits global ausgewählt
 
                     # Button zum Generieren von Fragen
                     if st.button(f"Fragen für '{uploaded_file.name}' generieren", key=f"generate_button_{file_idx}"):
@@ -661,7 +667,7 @@ def main():
                 if use_global_settings:
                     user_input = general_user_input
                     learning_goals = general_learning_goals
-                    selected_types = st.session_state.global_selected_types
+                    # selected_types bereits global ausgewählt
 
                     # Button zum Generieren von Fragen
                     if st.button(f"Fragen für Bild '{uploaded_file.name}' generieren", key=f"generate_button_image_{file_idx}"):
@@ -677,7 +683,7 @@ def main():
                     learning_goals = st.text_area(f"Lernziele für Bild '{uploaded_file.name}' (Optional):", key=f"learning_goals_image_{file_idx}")
                     
                     # Fragetypen auswählen (global)
-                    selected_types = st.session_state.global_selected_types
+                    # selected_types bereits global ausgewählt
 
                     # Button zum Generieren von Fragen
                     if st.button(f"Fragen für Bild '{uploaded_file.name}' generieren", key=f"generate_button_image_{file_idx}"):
