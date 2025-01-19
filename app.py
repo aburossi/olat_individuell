@@ -333,8 +333,8 @@ def get_chatgpt_response(prompt, model, image=None, selected_language="English")
 
             **Input-Analyse:**
 
-            - Du analysierst du den Inhalt sorgfältig, um die Schlüsselkonzepte und wichtigen Informationen zu verstehen.
-            - Falls vorhanden, du achtest auf Diagramme, Grafiken, Bilder oder Infografiken, um Bildungsinhalte abzuleiten.
+            - Du analysierst den Inhalt sorgfältig, um die Schlüsselkonzepte und wichtigen Informationen zu verstehen.
+            - Falls vorhanden, achtest du auf Diagramme, Grafiken, Bilder oder Infografiken, um Bildungsinhalte abzuleiten.
 
             **Fragen-Generierung nach Bloom-Ebene:**
             Basierend auf dem analysierten Material generierst du Fragen über alle die folgenden Ebenen der Bloom's Taxonomy:
@@ -500,22 +500,6 @@ def process_pdf(file):
 
 def main():
     """Hauptfunktion für die Streamlit-App."""
-    # Modellenauswahl mit Dropdown
-    st.subheader("Modell für die Generierung auswählen:")
-    model_options = ["gpt-4o", "gpt-4o-mini"]
-    selected_model = st.selectbox("Wählen Sie das Modell aus:", model_options, index=0)
-
-    # Sprachenauswahl mit Radiobuttons
-    st.subheader("Sprache für generierte Fragen auswählen:")
-    languages = {
-        "Deutsch": "German",
-        "Englisch": "English",
-        "Französisch": "French",
-        "Italienisch": "Italian",
-        "Spanisch": "Spanish"
-    }
-    selected_language = st.radio("Wählen Sie die Sprache für die Ausgabe:", list(languages.keys()), index=0)
-
     # Auswahl zwischen globalen oder individuellen Einstellungen
     st.subheader("Einstellungen für Fragen und Lernziele auswählen:")
     settings_option = st.radio(
@@ -534,12 +518,29 @@ def main():
             st.session_state.global_selected_types = []
         
         # Fragetypen auswählen global
-        selected_types = st.multiselect("Wählen Sie die Fragetypen zur Generierung aus:", MESSAGE_TYPES, key="global_selected_types")
+        st.markdown("### **Wählen Sie die Fragetypen zur Generierung aus:**")
+        selected_types = st.multiselect("Fragetypen:", MESSAGE_TYPES, key="global_selected_types")
     else:
         use_global_settings = False
         general_user_input = None
         general_learning_goals = None
-        selected_types = []
+        selected_types = []  # Wird pro Datei ausgewählt
+
+    # Modellenauswahl mit Dropdown
+    st.subheader("Modell für die Generierung auswählen:")
+    model_options = ["gpt-4o", "gpt-4o-mini"]
+    selected_model = st.selectbox("Wählen Sie das Modell aus:", model_options, index=0)
+
+    # Sprachenauswahl mit Radiobuttons
+    st.subheader("Sprache für generierte Fragen auswählen:")
+    languages = {
+        "Deutsch": "German",
+        "Englisch": "English",
+        "Französisch": "French",
+        "Italienisch": "Italian",
+        "Spanisch": "Spanish"
+    }
+    selected_language = st.radio("Wählen Sie die Sprache für die Ausgabe:", list(languages.keys()), index=0)
 
     # Dateiuploader-Bereich mit Mehrfachauswahl
     uploaded_files = st.file_uploader(
@@ -642,8 +643,8 @@ def main():
                     user_input = st.text_area(f"Geben Sie Ihren Text oder Ihre Frage für '{uploaded_file.name}' ein:", value=text_content, key=f"text_area_{file_idx}")
                     learning_goals = st.text_area(f"Lernziele für '{uploaded_file.name}' (Optional):", key=f"learning_goals_{file_idx}")
                     
-                    # Fragetypen auswählen (global)
-                    # selected_types bereits global ausgewählt
+                    # Fragetypen auswählen (global ausgewählt)
+                    selected_types = st.session_state.global_selected_types
 
                     # Button zum Generieren von Fragen
                     if st.button(f"Fragen für '{uploaded_file.name}' generieren", key=f"generate_button_{file_idx}"):
@@ -682,8 +683,8 @@ def main():
                     user_input = st.text_area(f"Geben Sie Ihren Text oder Ihre Frage für Bild '{uploaded_file.name}' ein:", key=f"text_area_image_{file_idx}")
                     learning_goals = st.text_area(f"Lernziele für Bild '{uploaded_file.name}' (Optional):", key=f"learning_goals_image_{file_idx}")
                     
-                    # Fragetypen auswählen (global)
-                    # selected_types bereits global ausgewählt
+                    # Fragetypen auswählen (global ausgewählt)
+                    selected_types = st.session_state.global_selected_types
 
                     # Button zum Generieren von Fragen
                     if st.button(f"Fragen für Bild '{uploaded_file.name}' generieren", key=f"generate_button_image_{file_idx}"):
