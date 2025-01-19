@@ -16,10 +16,10 @@ import os
 import zipfile
 import tempfile
 
-# Logging für bessere Fehlerverfolgung einrichten
+# Logging for better error tracking
 logging.basicConfig(level=logging.INFO)
 
-# Seitenkonfiguration festlegen und Light Mode erzwingen
+# Set page configuration and enforce Light Mode
 st.set_page_config(
     page_title="📝 OLAT Fragen Generator",
     layout="wide",
@@ -48,10 +48,10 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Titel der App
+# App Title
 st.title("📝 Fragen Generator")
 
-# Seitenleiste für Anweisungen und Zusatzinformationen
+# Sidebar for Instructions and Additional Information
 with st.sidebar:
     st.header("❗ **So verwenden Sie diese App**")
     
@@ -59,7 +59,7 @@ with st.sidebar:
     1. **Geben Sie Ihren OpenAI-API-Schlüssel ein**: Erhalten Sie Ihren API-Schlüssel von [OpenAI](https://platform.openai.com/account/api-keys) und geben Sie ihn im Feld *OpenAI-API-Schlüssel* ein.
     """)
     
-    # YouTube-Video in die Seitenleiste einbetten
+    # Embed YouTube Video in Sidebar
     components.html("""
         <iframe width="100%" height="180" src="https://www.youtube.com/embed/NsTAjBdHb1k" 
         title="Demo-Video auf Deutsch" frameborder="0" allow="accelerometer; autoplay; 
@@ -67,7 +67,7 @@ with st.sidebar:
         </iframe>
     """, height=180)
     
-    # Weitere Anweisungen
+    # Additional Instructions
     st.markdown("""
     2. **Laden Sie eine oder mehrere PDF, DOCX oder Bilddateien hoch**: Wählen Sie Dateien von Ihrem Computer aus.
     3. **Sprache auswählen**: Wählen Sie die gewünschte Sprache für die generierten Fragen.
@@ -76,7 +76,7 @@ with st.sidebar:
     6. **Generierte Inhalte herunterladen**: Nach der Generierung können Sie die Antworten herunterladen.
     """)
     
-    # Kosteninformationen und Frage-Erklärungen
+    # Cost Information and Question Type Explanations
     st.markdown('''
     <div class="custom-info">
         <strong>ℹ️ Kosteninformationen:</strong>
@@ -132,7 +132,7 @@ with st.sidebar:
     </div>
     ''', unsafe_allow_html=True)
 
-    # Trennlinie und Lizenzinformationen
+    # Separator and License Information
     st.markdown("---")
     st.header("📜 Lizenz")
     st.markdown("""
@@ -140,14 +140,14 @@ with st.sidebar:
     Sie dürfen diese Software verwenden, ändern und weitergeben, solange die ursprüngliche Lizenz beibehalten wird.
     """)
 
-    # Kontaktinformationen
+    # Contact Information
     st.header("💬 Kontakt")
     st.markdown("""
     Für Unterstützung, Fragen oder um mehr über die Nutzung dieser App zu erfahren, kannst du gerne auf mich zukommen.
     **Kontakt**: [Pietro](mailto:pietro.rossi@bbw.ch)
     """)
 
-# Streamlit Widgets für API-Schlüssel Eingabe
+# Streamlit Widgets for API Key Input
 st.header("🔑 Geben Sie Ihren OpenAI-API-Schlüssel ein")
 api_key = st.text_input("OpenAI-API-Schlüssel:", type="password")
 
@@ -172,7 +172,7 @@ if api_key:
     except Exception as e:
         st.error(f"Fehler bei der Initialisierung des OpenAI-Clients: {e}")
 
-# Liste der verfügbaren Fragetypen
+# List of Available Question Types
 MESSAGE_TYPES = [
     "single_choice",
     "multiple_choice1",
@@ -186,12 +186,12 @@ MESSAGE_TYPES = [
 
 @st.cache_data
 def read_prompt_from_md(filename):
-    """Liest den Prompt aus einer Markdown-Datei und speichert das Ergebnis zwischen."""
+    """Reads the prompt from a Markdown file and caches the result."""
     with open(f"{filename}.md", "r", encoding="utf-8") as file:
         return file.read()
 
 def process_image(_image):
-    """Verarbeitet und verkleinert ein Bild, um den Speicherverbrauch zu reduzieren."""
+    """Processes and resizes an image to reduce memory usage."""
     if isinstance(_image, (str, bytes)):
         img = Image.open(io.BytesIO(base64.b64decode(_image) if isinstance(_image, str) else _image))
     elif isinstance(_image, Image.Image):
@@ -199,16 +199,16 @@ def process_image(_image):
     else:
         img = Image.open(_image)
 
-    # Konvertiere in RGB-Modus, falls erforderlich
+    # Convert to RGB mode if necessary
     if img.mode != 'RGB':
         img = img.convert('RGB')
 
-    # Verkleinern, wenn das Bild zu groß ist
-    max_size = 1000  # Reduzierte Maximalgröße zur Verringerung des Speicherverbrauchs
+    # Resize if the image is too large
+    max_size = 1000  # Reduced maximum size to lower memory usage
     if max(img.size) > max_size:
         img.thumbnail((max_size, max_size))
 
-    # Speichern in Bytes
+    # Save to bytes
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='JPEG')
     img_byte_arr = img_byte_arr.getvalue()
@@ -216,7 +216,7 @@ def process_image(_image):
     return base64.b64encode(img_byte_arr).decode('utf-8')
 
 def replace_german_sharp_s(text):
-    """Ersetzt alle Vorkommen von 'ß' durch 'ss'."""
+    """Replaces all occurrences of 'ß' with 'ss'."""
     return text.replace('ß', 'ss')
 
 
@@ -289,7 +289,7 @@ def transform_output(json_string):
         json_data = json.loads(cleaned_json_string)
         fib_output, ic_output = convert_json_to_text_format(json_data)
         
-        # Anwenden der Reinigungsfunktion
+        # Apply the replacement function
         fib_output = replace_german_sharp_s(fib_output)
         ic_output = replace_german_sharp_s(ic_output)
 
@@ -319,13 +319,13 @@ def transform_output(json_string):
         return "Fehler: Eingabe konnte nicht verarbeitet werden"
 
 def get_chatgpt_response(prompt, model, image=None, selected_language="English"):
-    """Ruft eine Antwort von OpenAI GPT mit Fehlerbehandlung ab."""
+    """Fetches a response from OpenAI GPT with error handling."""
     if not client:
         st.error("Kein gültiger OpenAI-API-Schlüssel vorhanden. Bitte geben Sie Ihren API-Schlüssel ein.")
         return None
 
     try:
-        # System-Prompt erstellen, der Sprachinstruktionen enthält
+        # System Prompt with language instructions
         system_prompt = (
             """
             Du bist ein Experte im Bildungsbereich, spezialisiert auf die Erstellung von Testfragen und -antworten zu allen Themen, unter Einhaltung der Bloom's Taxonomy. Deine Aufgabe ist es, hochwertige Frage-Antwort-Sets basierend auf dem vom Benutzer bereitgestellten Material zu erstellen, wobei jede Frage einer spezifischen Ebene der Bloom's Taxonomy entspricht: Erinnern, Verstehen, Anwenden, Analysieren, Bewerten und Erstellen.
@@ -363,7 +363,7 @@ def get_chatgpt_response(prompt, model, image=None, selected_language="English")
         response = client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=15000,  # Updated max tokens
+            max_tokens=15000,  # Adjusted max tokens
             temperature=0.6
         )
         
@@ -374,7 +374,7 @@ def get_chatgpt_response(prompt, model, image=None, selected_language="English")
         return None
 
 def generate_questions(user_input, learning_goals, selected_types, content, is_image, file_name, selected_language, selected_model, generated_content):
-    """Generiert Fragen für das gegebene Inhalt (Text oder Bild) und fügt sie dem generierten Inhalt hinzu."""
+    """Generates questions for the given content (text or image) and appends them to the generated_content dictionary."""
     if not client:
         st.error("Ein gültiger OpenAI-API-Schlüssel ist erforderlich, um Fragen zu generieren.")
         return
@@ -403,13 +403,13 @@ def generate_questions(user_input, learning_goals, selected_types, content, is_i
 
 @st.cache_data
 def convert_pdf_to_images(file):
-    """Konvertiert PDF-Seiten in Bilder."""
+    """Converts PDF pages to images."""
     images = convert_from_bytes(file.read())
     return images
 
 @st.cache_data
 def extract_text_from_pdf(file):
-    """Extrahiert Text aus PDF mit PyPDF2."""
+    """Extracts text from PDF using PyPDF2."""
     pdf_reader = PyPDF2.PdfReader(file)
     text = ""
     for page in pdf_reader.pages:
@@ -420,20 +420,20 @@ def extract_text_from_pdf(file):
 
 @st.cache_data
 def extract_text_from_docx(file):
-    """Extrahiert Text aus DOCX-Datei."""
+    """Extracts text from DOCX file."""
     doc = docx.Document(file)
     text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
     return text.strip()
 
 def is_pdf_ocr(text):
-    """Prüft, ob das PDF OCR-Text enthält (Implementierung erforderlich)."""
-    # Dummy-Implementierung, bitte nach Bedarf anpassen
+    """Checks if the PDF contains OCR text (implementation required)."""
+    # Dummy implementation; adjust as needed
     return bool(text)
 
 def process_pdf(file):
     text_content = extract_text_from_pdf(file)
     
-    # Wenn kein Text gefunden wurde, nehme an, dass es ein nicht-OCR-PDF ist
+    # If no text is found, assume it's a non-OCR PDF
     if not text_content or not is_pdf_ocr(text_content):
         st.warning(f"PDF '{file.name}' ist möglicherweise nicht OCR-geschützt. Textextraktion fehlgeschlagen. Bitte laden Sie ein OCR-PDF hoch.")
         images = convert_pdf_to_images(file)
@@ -442,13 +442,13 @@ def process_pdf(file):
         return text_content, None
 
 def main():
-    """Hauptfunktion für die Streamlit-App."""
-    # Modellenauswahl mit Dropdown
+    """Main function for the Streamlit app."""
+    # Model selection with dropdown
     st.subheader("Modell für die Generierung auswählen:")
     model_options = ["gpt-4o", "gpt-4o-mini"]
     selected_model = st.selectbox("Wählen Sie das Modell aus:", model_options, index=0)
 
-    # Sprachenauswahl mit Radiobuttons
+    # Language selection with radio buttons
     st.subheader("Sprache für generierte Fragen auswählen:")
     languages = {
         "Deutsch": "German",
@@ -459,7 +459,7 @@ def main():
     }
     selected_language = st.radio("Wählen Sie die Sprache für die Ausgabe:", list(languages.keys()), index=0)
 
-    # Dateiuploader-Bereich
+    # File uploader section
     uploaded_files = st.file_uploader(
         "Laden Sie eine oder mehrere PDF, DOCX oder Bilddateien hoch", 
         type=["pdf", "docx", "jpg", "jpeg", "png"],
@@ -467,15 +467,16 @@ def main():
     )
 
     if uploaded_files:
-        st.cache_data.clear()  # Dies löscht den Cache, um vorherige zwischengespeicherte Werte zu vermeiden
+        st.cache_data.clear()  # Clear cache to avoid stale data
 
+    # Categorize uploaded files
     images = [f for f in uploaded_files if f.type.startswith('image/')]
     pdfs = [f for f in uploaded_files if f.type == 'application/pdf']
     docx_files = [f for f in uploaded_files if f.type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
 
     generated_content = {}
 
-    # Verarbeitung von DOCX-Dateien
+    # Processing DOCX files
     if docx_files:
         st.header("Verarbeitete DOCX-Dateien")
         for docx_file in docx_files:
@@ -483,7 +484,7 @@ def main():
             st.markdown(f"### {docx_file.name}")
             st.text_area(f"Extrahierter Text aus {docx_file.name}:", value=text_content, height=200, key=f"docx_{docx_file.name}")
 
-    # Verarbeitung von PDFs
+    # Processing PDF files
     if pdfs:
         st.header("Verarbeitete PDFs")
         for pdf in pdfs:
@@ -494,13 +495,13 @@ def main():
             if images_from_pdf:
                 st.image(images_from_pdf, caption=f'PDF Seiten aus {pdf.name}', use_column_width=True)
 
-    # Verarbeitung von Bildern
+    # Processing Image files
     if images:
         st.header("Hochgeladene Bilder")
         for img in images:
             st.image(img, caption=img.name, use_column_width=True)
 
-    # Benutzerdefiniertes CSS für Callouts
+    # Custom CSS for Callouts
     st.markdown(
         """
         <style>
@@ -526,7 +527,7 @@ def main():
         """, unsafe_allow_html=True
     )
 
-    # Benutzerdefinierte Eingaben für Bilder
+    # User Inputs for Images
     if images:
         st.subheader("Einstellungen für alle Bilder")
         image_user_input = st.text_area("Geben Sie Ihre Frage oder Anweisungen für die Bilder ein:", key="global_image_text_area")
@@ -537,7 +538,7 @@ def main():
             if not client:
                 st.error("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein, um Fragen zu generieren.")
             elif image_user_input and image_selected_types:
-                # Initialisieren des generierten Inhalts für Bilder
+                # Initialize generated_content for each image and question type
                 for img in images:
                     for msg_type in image_selected_types:
                         if msg_type == "inline_fib":
@@ -545,8 +546,8 @@ def main():
                         else:
                             key = f"Fragen für {img.name} - {msg_type.replace('_', ' ').title()}"
                         generated_content[key] = ""
-                
-                # Generieren der Fragen für jede Bilddatei
+
+                # Generate questions for each image
                 for img in images:
                     generate_questions(
                         user_input=image_user_input,
@@ -563,7 +564,7 @@ def main():
             else:
                 st.warning("Bitte geben Sie Text ein und wählen Sie Fragetypen für die Bilder aus.")
 
-    # Benutzerdefinierte Eingaben für PDFs
+    # User Inputs for PDFs
     if pdfs:
         st.subheader("Einstellungen für alle PDFs")
         pdf_user_input = st.text_area("Geben Sie Ihre Frage oder Anweisungen für die PDFs ein:", key="global_pdf_text_area")
@@ -574,7 +575,7 @@ def main():
             if not client:
                 st.error("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein, um Fragen zu generieren.")
             elif pdf_user_input and pdf_selected_types:
-                # Initialisieren des generierten Inhalts für PDFs
+                # Initialize generated_content for each PDF and question type
                 for pdf in pdfs:
                     for msg_type in pdf_selected_types:
                         if msg_type == "inline_fib":
@@ -582,8 +583,8 @@ def main():
                         else:
                             key = f"Fragen für {pdf.name} - {msg_type.replace('_', ' ').title()}"
                         generated_content[key] = ""
-                
-                # Generieren der Fragen für jede PDF-Datei
+
+                # Generate questions for each PDF
                 for pdf in pdfs:
                     text_content, images_from_pdf = process_pdf(pdf)
                     if text_content:
@@ -616,19 +617,19 @@ def main():
             else:
                 st.warning("Bitte geben Sie Text ein und wählen Sie Fragetypen für die PDFs aus.")
 
-    # Anzeige und Download der generierten Inhalte
+    # Display and Download Generated Content
     if generated_content:
         st.header("Generierter Inhalt")
         for title, content in generated_content.items():
             st.subheader(title)
             st.text_area(title, value=content, height=300)
 
-            # Download-Button für jede generierte Datei
-            b64 = base64.b64encode(content.encode()).decode()  # B64 encodieren
+            # Download Button for Each Generated File
+            b64 = base64.b64encode(content.encode()).decode()  # B64 encode
             href = f'<a href="data:text/plain;base64,{b64}" download="{title.replace(" ", "_")}.txt">📥 Download</a>'
             st.markdown(href, unsafe_allow_html=True)
 
-        # Optional: Download aller Inhalte in einer ZIP-Datei
+        # Optional: Download All Contents as a ZIP File
         with tempfile.TemporaryDirectory() as tmpdirname:
             zip_path = os.path.join(tmpdirname, "generierte_antworten.zip")
             with zipfile.ZipFile(zip_path, 'w') as zipf:
