@@ -13,6 +13,8 @@ import logging
 import streamlit.components.v1 as components
 import httpx
 import os
+import zipfile
+import tempfile
 
 # Logging für bessere Fehlerverfolgung einrichten
 logging.basicConfig(level=logging.INFO)
@@ -346,21 +348,11 @@ def get_chatgpt_response(prompt, model, image=None, selected_language="English")
         
         if image:
             base64_image = process_image(image)
+            # Embed the image using Markdown syntax
+            prompt_with_image = f"{prompt}\n\n![Image](data:image/jpeg;base64,{base64_image})"
             messages = [
                 {"role": "system", "content": system_prompt},
-                {
-                    "role": "user", 
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}",
-                                "detail": "low"
-                            }
-                        }
-                    ]
-                }
+                {"role": "user", "content": prompt_with_image}
             ]
         else:
             messages = [
@@ -381,7 +373,7 @@ def get_chatgpt_response(prompt, model, image=None, selected_language="English")
         logging.error(f"Fehler bei der Kommunikation mit der OpenAI API: {e}")
         return None
 
-def generate_questions(user_input, learning_goals, selected_types, content, is_image, selected_language, selected_model, generated_content):
+def generate_questions(user_input, learning_goals, selected_types, content, is_image, file_name, selected_language, selected_model, generated_content):
     """Generiert Fragen für das gegebene Inhalt (Text oder Bild) und fügt sie dem generierten Inhalt hinzu."""
     if not client:
         st.error("Ein gültiger OpenAI-API-Schlüssel ist erforderlich, um Fragen zu generieren.")
@@ -395,24 +387,19 @@ def generate_questions(user_input, learning_goals, selected_types, content, is_i
             if response:
                 if msg_type == "inline_fib":
                     processed_response = transform_output(response)
-                    generated_content[msg_type.replace('_', ' ').title()] += f"{processed_response}\n\n"
+                    key = f"Fragen für {file_name} - Inline/FIB"
                 else:
-                    generated_content[msg_type.replace('_', ' ').title()] += f"{response}\n\n"
-            else:
-                st.error(f"Fehler bei der Generierung einer Antwort für {msg_type}.")
-        except Exception as e:
-            st.error(f"Ein Fehler ist für {msg_type} aufgetreten: {str(e)}")
+                    key = f"Fragen für {file_name} - {msg_type.replace('_', ' ').title()}"
+                    processed_response = response
 
-def process_pdf(file):
-    text_content = extract_text_from_pdf(file)
-    
-    # Wenn kein Text gefunden wurde, nehme an, dass es ein nicht-OCR-PDF ist
-    if not text_content or not is_pdf_ocr(text_content):
-        st.warning(f"PDF '{file.name}' ist möglicherweise nicht OCR-geschützt. Textextraktion fehlgeschlagen. Bitte laden Sie ein OCR-PDF hoch.")
-        images = convert_pdf_to_images(file)
-        return None, images
-    else:
-        return text_content, None
+                if key not in generated_content:
+                    generated_content[key] = ""
+
+                generated_content[key] += f"{processed_response}\n\n"
+            else:
+                st.error(f"Fehler bei der Generierung einer Antwort für {msg_type} in Datei {file_name}.")
+        except Exception as e:
+            st.error(f"Ein Fehler ist für {msg_type} in Datei {file_name} aufgetreten: {str(e)}")
 
 @st.cache_data
 def convert_pdf_to_images(file):
@@ -442,6 +429,17 @@ def is_pdf_ocr(text):
     """Prüft, ob das PDF OCR-Text enthält (Implementierung erforderlich)."""
     # Dummy-Implementierung, bitte nach Bedarf anpassen
     return bool(text)
+
+def process_pdf(file):
+    text_content = extract_text_from_pdf(file)
+    
+    # Wenn kein Text gefunden wurde, nehme an, dass es ein nicht-OCR-PDF ist
+    if not text_content or not is_pdf_ocr(text_content):
+        st.warning(f"PDF '{file.name}' ist möglicherweise nicht OCR-geschützt. Textextraktion fehlgeschlagen. Bitte laden Sie ein OCR-PDF hoch.")
+        images = convert_pdf_to_images(file)
+        return None, images
+    else:
+        return text_content, None
 
 def main():
     """Hauptfunktion für die Streamlit-App."""
@@ -541,7 +539,14 @@ def main():
             elif image_user_input and image_selected_types:
                 # Initialisieren des generierten Inhalts für Bilder
                 for img in images:
-                    generated_content[f"Fragen für {img.name}"] = ""
+                    for msg_type in image_selected_types:
+                        if msg_type == "inline_fib":
+                            key = f"Fragen für {img.name} - Inline/FIB"
+                        else:
+                            key = f"Fragen für {img.name} - {msg_type.replace('_', ' ').title()}"
+                        generated_content[key] = ""
+                
+                # Generieren der Fragen für jede Bilddatei
                 for img in images:
                     generate_questions(
                         user_input=image_user_input,
@@ -549,6 +554,7 @@ def main():
                         selected_types=image_selected_types,
                         content=img,
                         is_image=True,
+                        file_name=img.name,
                         selected_language=selected_language,
                         selected_model=selected_model,
                         generated_content=generated_content
@@ -570,7 +576,14 @@ def main():
             elif pdf_user_input and pdf_selected_types:
                 # Initialisieren des generierten Inhalts für PDFs
                 for pdf in pdfs:
-                    generated_content[f"Fragen für {pdf.name}"] = ""
+                    for msg_type in pdf_selected_types:
+                        if msg_type == "inline_fib":
+                            key = f"Fragen für {pdf.name} - Inline/FIB"
+                        else:
+                            key = f"Fragen für {pdf.name} - {msg_type.replace('_', ' ').title()}"
+                        generated_content[key] = ""
+                
+                # Generieren der Fragen für jede PDF-Datei
                 for pdf in pdfs:
                     text_content, images_from_pdf = process_pdf(pdf)
                     if text_content:
@@ -580,18 +593,21 @@ def main():
                             selected_types=pdf_selected_types,
                             content=text_content,
                             is_image=False,
+                            file_name=pdf.name,
                             selected_language=selected_language,
                             selected_model=selected_model,
                             generated_content=generated_content
                         )
                     if images_from_pdf:
                         for idx, img in enumerate(images_from_pdf):
+                            img_key = f"{pdf.name}_page_{idx+1}"
                             generate_questions(
                                 user_input=pdf_user_input,
                                 learning_goals=pdf_learning_goals,
                                 selected_types=pdf_selected_types,
                                 content=img,
                                 is_image=True,
+                                file_name=img_key,
                                 selected_language=selected_language,
                                 selected_model=selected_model,
                                 generated_content=generated_content
@@ -613,9 +629,6 @@ def main():
             st.markdown(href, unsafe_allow_html=True)
 
         # Optional: Download aller Inhalte in einer ZIP-Datei
-        import zipfile
-        import tempfile
-
         with tempfile.TemporaryDirectory() as tmpdirname:
             zip_path = os.path.join(tmpdirname, "generierte_antworten.zip")
             with zipfile.ZipFile(zip_path, 'w') as zipf:
