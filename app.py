@@ -470,7 +470,7 @@ def generate_all_questions(uploaded_files, general_user_input, general_learning_
                 image_content = Image.open(uploaded_file)
                 questions_text = generate_questions_for_content("", general_user_input, general_learning_goals, selected_types, selected_language, selected_model, image=image_content)
             else:
-                st.error(f"Nicht unterstützter Dateityp für '{filename}'.")
+                st.error(f"Nicht unterstützter Dateityp für '{uploaded_file.name}'.")
                 continue
 
             # Speichern der generierten Fragen als Textdatei im ZIP mit angepasstem Namen
@@ -514,6 +514,7 @@ def generate_questions_for_content(text, user_input, learning_goals, selected_ty
 def process_images(images, selected_language):
     """Verarbeitet hochgeladene Bilder und generiert Fragen."""
     for idx, image in enumerate(images):
+        # Vermeiden von verschachtelten Expandern: Kein outer expander, nur einzelne expanders
         with st.expander(f"📷 Vorschau Seite {idx+1}"):
             st.image(image, caption=f'Seite {idx+1}', use_column_width=True)
 
@@ -595,30 +596,33 @@ def main():
         st.markdown("### 📂 Hochgeladene Dateien")
         for idx, uploaded_file in enumerate(uploaded_files):
             file_idx = idx + 1
-            with st.expander(f"📄 Datei {file_idx}: {uploaded_file.name}"):
-                if uploaded_file.type == "application/pdf":
-                    text_content, images = process_pdf(uploaded_file)
-                    if text_content:
-                        with st.expander("📄 Extrahierter Text"):
-                            st.text_area("Extrahierter Text:", value=text_content, height=200, disabled=True)
-                        st.success("Text aus PDF extrahiert. Sie können ihn nun im folgenden Textfeld bearbeiten. PDFs, die länger als 5 Seiten sind, sollten gekürzt werden.")
-                    elif images:
-                        for img_idx, image in enumerate(images):
-                            with st.expander(f"📷 Vorschau Seite {img_idx+1}"):
-                                st.image(image, caption=f'Seite {img_idx+1}', use_column_width=True)
-                        st.success("PDF in Bilder konvertiert. Sie können jetzt Fragen zu jeder Seite stellen.")
-                elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-                    text_content = extract_text_from_docx(uploaded_file)
+            # **Removed the outer expander to prevent nested expanders**
+            st.write(f"**Datei {file_idx}: {uploaded_file.name}**")
+            if uploaded_file.type == "application/pdf":
+                text_content, images = process_pdf(uploaded_file)
+                if text_content:
+                    # **Use individual expander for extracted text**
                     with st.expander("📄 Extrahierter Text"):
                         st.text_area("Extrahierter Text:", value=text_content, height=200, disabled=True)
-                    st.success("Text erfolgreich extrahiert. Sie können ihn nun im folgenden Textbereich bearbeiten.")
-                elif uploaded_file.type.startswith('image/'):
-                    image_content = Image.open(uploaded_file)
-                    with st.expander("📷 Hochgeladenes Bild"):
-                        st.image(image_content, caption=f'Hochgeladenes Bild {file_idx}: {uploaded_file.name}', use_column_width=True)
-                    st.success("Bild erfolgreich hochgeladen. Sie können jetzt Fragen zum Bild stellen.")
-                else:
-                    st.error(f"Nicht unterstützter Dateityp für '{uploaded_file.name}'. Bitte laden Sie eine PDF, DOCX oder Bilddatei hoch.")
+                    st.success("Text aus PDF extrahiert. Sie können ihn nun im folgenden Textfeld bearbeiten. PDFs, die länger als 5 Seiten sind, sollten gekürzt werden.")
+                elif images:
+                    for img_idx, image in enumerate(images):
+                        # **Use individual expanders for each image preview**
+                        with st.expander(f"📷 Vorschau Seite {img_idx+1}"):
+                            st.image(image, caption=f'Seite {img_idx+1}', use_column_width=True)
+                    st.success("PDF in Bilder konvertiert. Sie können jetzt Fragen zu jeder Seite stellen.")
+            elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                text_content = extract_text_from_docx(uploaded_file)
+                with st.expander("📄 Extrahierter Text"):
+                    st.text_area("Extrahierter Text:", value=text_content, height=200, disabled=True)
+                st.success("Text erfolgreich extrahiert. Sie können ihn nun im folgenden Textbereich bearbeiten.")
+            elif uploaded_file.type.startswith('image/'):
+                image_content = Image.open(uploaded_file)
+                with st.expander("📷 Hochgeladenes Bild"):
+                    st.image(image_content, caption=f'Hochgeladenes Bild {file_idx}: {uploaded_file.name}', use_column_width=True)
+                st.success("Bild erfolgreich hochgeladen. Sie können jetzt Fragen zum Bild stellen.")
+            else:
+                st.error(f"Nicht unterstützter Dateityp für '{uploaded_file.name}'. Bitte laden Sie eine PDF, DOCX oder Bilddatei hoch.")
 
         # Button zum Generieren von Fragen für alle Dateien
         st.markdown("---")
