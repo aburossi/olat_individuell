@@ -18,11 +18,33 @@ import zipfile
 # Logging für bessere Fehlerverfolgung einrichten
 logging.basicConfig(level=logging.INFO)
 
-# Seitenkonfiguration festlegen
+# Seitenkonfiguration festlegen und Light Mode erzwingen (Optional)
 st.set_page_config(
     page_title="📝 OLAT Fragen Generator",
     layout="wide",
     initial_sidebar_state="expanded",
+)
+
+# Optional: Enforce Light Mode using CSS (can be removed if not necessary)
+st.markdown(
+    """
+    <style>
+    /* Force light mode */
+    body, .css-18e3th9, .css-1d391kg {
+        background-color: white;
+        color: black;
+    }
+    /* Override Streamlit's default dark mode elements */
+    .css-1aumxhk, .css-1v3fvcr {
+        background-color: white;
+    }
+    /* Ensure all text is dark */
+    .css-1v0mbdj, .css-1xarl3l {
+        color: black;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
 # Titel der App
@@ -46,7 +68,7 @@ with st.sidebar:
     
     # Weitere Anweisungen
     st.markdown("""
-    2. **Laden Sie eine oder mehrere PDF, DOCX oder Bilddateien hoch oder geben Sie Text direkt ein**: Wählen Sie eine oder mehrere Dateien von Ihrem Computer aus oder nutzen Sie das Textfeld unten.
+    2. **Laden Sie eine oder mehrere PDF, DOCX oder Bilddateien hoch**: Wählen Sie eine oder mehrere Dateien von Ihrem Computer aus.
     3. **Modell auswählen**: Wählen Sie das gewünschte Modell für die Generierung aus.
     4. **Sprache auswählen**: Wählen Sie die gewünschte Sprache für die generierten Fragen.
     5. **Fragetypen auswählen**: Wählen Sie die Typen der Fragen, die Sie generieren möchten.
@@ -300,7 +322,7 @@ def transform_output(json_string):
         st.code(json_string)
         return "Fehler: Eingabe konnte nicht verarbeitet werden"
 
-def get_chatgpt_response(prompt, image=None, selected_language="English", model="gpt-4o"):
+def get_chatgpt_response(prompt, model, image=None, selected_language="English"):
     """Ruft eine Antwort von OpenAI GPT mit Fehlerbehandlung ab."""
     if not client:
         st.error("Kein gültiger OpenAI-API-Schlüssel vorhanden. Bitte geben Sie Ihren API-Schlüssel ein.")
@@ -325,6 +347,9 @@ def get_chatgpt_response(prompt, image=None, selected_language="English", model=
             - **Erinnern**: Einfache, abrufbasierte Fragen.
             - **Verstehen**: Fragen, die das Verständnis des Materials bewerten.
             - **Anwenden**: Fragen, die die Anwendung des Wissens in praktischen Situationen erfordern.
+            - **Analysieren**: Fragen, die die Fähigkeit zur Analyse des Materials testen.
+            - **Bewerten**: Fragen, die die Bewertung von Informationen oder Ideen verlangen.
+            - **Erstellen**: Fragen, die die Erstellung neuer Inhalte oder Konzepte erfordern.
             """
         )
         
@@ -355,7 +380,7 @@ def get_chatgpt_response(prompt, image=None, selected_language="English", model=
         response = client.chat.completions.create(
             model=model,  # Dynamische Modellwahl
             messages=messages,
-            max_tokens=15000,  # Erhöht auf 15000
+            max_tokens=15000,  # Auf 15000 zurückgesetzt
             temperature=0.6
         )
         
@@ -405,41 +430,6 @@ def process_pdf(file):
     else:
         return text_content, None
 
-def generate_questions_for_content(text, user_input, learning_goals, selected_types, selected_language, selected_model, image=None):
-    """Generiert Fragen basierend auf dem bereitgestellten Inhalt oder Bild."""
-    all_responses = ""
-    generated_content = {}
-    for msg_type in selected_types:
-        prompt_template = read_prompt_from_md(msg_type)
-        if not prompt_template:
-            continue  # Überspringen, wenn keine Prompt-Datei gefunden wurde
-
-        # Kombination des Prompt-Templates mit Benutzerinput und Lernzielen
-        full_prompt = f"{prompt_template}\n\nBenutzereingabe: {user_input}\n\nLernziele: {learning_goals}"
-        
-        response = get_chatgpt_response(
-            prompt=full_prompt,
-            image=image,
-            selected_language=selected_language,
-            model=selected_model
-        )
-        
-        if response:
-            if msg_type == "inline_fib":
-                processed_response = transform_output(response)
-                generated_content[f"{msg_type.replace('_', ' ').title()} (Verarbeitet)"] = processed_response
-                all_responses += f"{processed_response}\n\n"
-            else:
-                generated_content[msg_type.replace('_', ' ').title()] = response
-                all_responses += f"{response}\n\n"
-        else:
-            st.error(f"Fehler bei der Generierung einer Antwort für {msg_type}.")
-
-    # Reinigungsfunktion auf alle Antworten anwenden
-    all_responses = replace_german_sharp_s(all_responses)
-
-    return all_responses
-
 def generate_all_questions(uploaded_files, general_user_input, general_learning_goals, selected_types, selected_language, selected_model):
     """Generiert Fragen für alle hochgeladenen Dateien und gibt eine ZIP-Datei zurück."""
     if not client:
@@ -461,59 +451,29 @@ def generate_all_questions(uploaded_files, general_user_input, general_learning_
                 text_content, images = process_pdf(uploaded_file)
                 if text_content:
                     # Generieren der Fragen basierend auf dem extrahierten Text
-                    questions_text = generate_questions_for_content(
-                        text=text_content,
-                        user_input=general_user_input,
-                        learning_goals=general_learning_goals,
-                        selected_types=selected_types,
-                        selected_language=selected_language,
-                        selected_model=selected_model
-                    )
+                    questions_text = generate_questions_for_content(text_content, general_user_input, general_learning_goals, selected_types, selected_language, selected_model)
                 elif images:
                     # Wenn PDF als Bilder verarbeitet wird, generiere Fragen für jede Seite
                     questions_text = ""
                     for idx, image in enumerate(images):
                         page_number = idx + 1
                         st.info(f"Generiere Fragen für Seite {page_number} von '{filename}'...")
-                        questions = generate_questions_for_content(
-                            text="",
-                            user_input=general_user_input,
-                            learning_goals=general_learning_goals,
-                            selected_types=selected_types,
-                            selected_language=selected_language,
-                            selected_model=selected_model,
-                            image=image
-                        )
+                        questions = generate_questions_for_content("", general_user_input, general_learning_goals, selected_types, selected_language, selected_model, image=image)
                         questions_text += f"### Seite {page_number}\n{questions}\n\n"
                 else:
                     st.error(f"Fehler beim Verarbeiten von '{filename}'.")
                     continue
             elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
                 text_content = extract_text_from_docx(uploaded_file)
-                questions_text = generate_questions_for_content(
-                    text=text_content,
-                    user_input=general_user_input,
-                    learning_goals=general_learning_goals,
-                    selected_types=selected_types,
-                    selected_language=selected_language,
-                    selected_model=selected_model
-                )
+                questions_text = generate_questions_for_content(text_content, general_user_input, general_learning_goals, selected_types, selected_language, selected_model)
             elif uploaded_file.type.startswith('image/'):
                 image_content = Image.open(uploaded_file)
-                questions_text = generate_questions_for_content(
-                    text="",
-                    user_input=general_user_input,
-                    learning_goals=general_learning_goals,
-                    selected_types=selected_types,
-                    selected_language=selected_language,
-                    selected_model=selected_model,
-                    image=image_content
-                )
+                questions_text = generate_questions_for_content("", general_user_input, general_learning_goals, selected_types, selected_language, selected_model, image=image_content)
             else:
                 st.error(f"Nicht unterstützter Dateityp für '{filename}'.")
                 continue
 
-            # Speichern der generierten Fragen als Textdatei im ZIP
+            # Speichern der generierten Fragen als Textdatei im ZIP mit angepasstem Namen
             txt_filename = f"{os.path.splitext(filename)[0]}_olat.txt"
             zip_file.writestr(txt_filename, questions_text)
             st.success(f"Fragen für '{filename}' generiert und hinzugefügt.")
@@ -521,17 +481,98 @@ def generate_all_questions(uploaded_files, general_user_input, general_learning_
     zip_buffer.seek(0)
     return zip_buffer
 
+def generate_questions_for_content(text, user_input, learning_goals, selected_types, selected_language, selected_model, image=None):
+    """Generiert Fragen basierend auf dem bereitgestellten Inhalt oder Bild."""
+    all_responses = ""
+    generated_content = {}
+    for msg_type in selected_types:
+        prompt_template = read_prompt_from_md(msg_type)
+        if not prompt_template:
+            continue  # Überspringen, wenn keine Prompt-Datei gefunden wurde
+
+        # Kombination des Prompt-Templates mit Benutzerinput und Lernzielen
+        full_prompt = f"{prompt_template}\n\nBenutzereingabe: {user_input}\n\nLernziele: {learning_goals}"
+        
+        response = get_chatgpt_response(full_prompt, model=selected_model, image=image, selected_language=selected_language)
+        
+        if response:
+            if msg_type == "inline_fib":
+                processed_response = transform_output(response)
+                generated_content[f"{msg_type.replace('_', ' ').title()} (Verarbeitet)"] = processed_response
+                all_responses += f"{processed_response}\n\n"
+            else:
+                generated_content[msg_type.replace('_', ' ').title()] = response
+                all_responses += f"{response}\n\n"
+        else:
+            st.error(f"Fehler bei der Generierung einer Antwort für {msg_type}.")
+
+    # Reinigungsfunktion auf alle Antworten anwenden
+    all_responses = replace_german_sharp_s(all_responses)
+
+    return all_responses
+
+def process_images(images, selected_language):
+    """Verarbeitet hochgeladene Bilder und generiert Fragen."""
+    for idx, image in enumerate(images):
+        with st.expander(f"📷 Vorschau Seite {idx+1}"):
+            st.image(image, caption=f'Seite {idx+1}', use_column_width=True)
+
+        # Textbereich für Benutzereingaben und Lernziele
+        user_input = st.text_area(f"Geben Sie Ihre Frage oder Anweisungen für Seite {idx+1} ein:", key=f"text_area_{idx}")
+        learning_goals = st.text_area(f"Lernziele für Seite {idx+1} (Optional):", key=f"learning_goals_{idx}")
+        selected_types = st.multiselect(f"Wählen Sie die Fragetypen für Seite {idx+1} aus:", MESSAGE_TYPES, key=f"selected_types_{idx}")
+
+        # Button zum Generieren von Fragen für die Seite
+        if st.button(f"Fragen für Seite {idx+1} generieren", key=f"generate_button_{idx}"):
+            # Fragen nur generieren, wenn Benutzereingaben und ausgewählte Fragetypen vorhanden sind
+            if user_input and selected_types:
+                # Übergabe der ausgewählten Sprache hier
+                generate_questions_with_image(user_input, learning_goals, selected_types, image, selected_language)
+            else:
+                st.warning(f"Bitte geben Sie Text ein und wählen Sie Fragetypen für Seite {idx+1} aus.")
+
 def main():
     """Hauptfunktion für die Streamlit-App."""
-    # Modellenauswahl mit Checkbox
+    # Auswahl zwischen globalen oder individuellen Einstellungen
+    st.subheader("Einstellungen für Fragen und Lernziele auswählen:")
+    settings_option = st.radio(
+        "Möchten Sie allgemeine Fragen und Lernziele für alle Dateien verwenden oder für jede Datei individuell?",
+        ("Allgemeine Einstellungen für alle Dateien", "Individuelle Einstellungen pro Datei")
+    )
+
+    if settings_option == "Allgemeine Einstellungen für alle Dateien":
+        use_global_settings = True
+        st.markdown("### **Allgemeine Fragen und Lernziele für alle Dateien**")
+        general_user_input = st.text_area("Allgemeine Fragen oder Anweisungen:", key="general_user_input")
+        general_learning_goals = st.text_area("Allgemeine Lernziele (Optional):", key="general_learning_goals")
+        
+        # Initialisierung der global_selected_types in session_state, falls nicht vorhanden
+        if 'global_selected_types' not in st.session_state:
+            st.session_state.global_selected_types = []
+        
+        # Fragetypen auswählen global
+        st.markdown("### **Wählen Sie die Fragetypen zur Generierung aus:**")
+        selected_types = st.multiselect("Fragetypen:", MESSAGE_TYPES, key="global_selected_types")
+    else:
+        # Individuelle Einstellungen wurden entfernt, wie vom Benutzer gewünscht
+        st.warning("Die individuellen Einstellungen pro Datei wurden entfernt. Nur allgemeine Einstellungen sind verfügbar.")
+        use_global_settings = False
+        general_user_input = st.text_area("Allgemeine Fragen oder Anweisungen:", key="general_user_input")
+        general_learning_goals = st.text_area("Allgemeine Lernziele (Optional):", key="general_learning_goals")
+        
+        # Initialisierung der global_selected_types in session_state, falls nicht vorhanden
+        if 'global_selected_types' not in st.session_state:
+            st.session_state.global_selected_types = []
+        
+        # Fragetypen auswählen global
+        st.markdown("### **Wählen Sie die Fragetypen zur Generierung aus:**")
+        selected_types = st.multiselect("Fragetypen:", MESSAGE_TYPES, key="global_selected_types")
+
+    # Modellenauswahl mit Checkbox (implemented as radio buttons for mutual exclusivity)
     st.subheader("Modell für die Generierung auswählen:")
     model_options = ["gpt-4o", "gpt-4o-mini"]
-    selected_model = st.selectbox(
-        "Wählen Sie das Modell aus:",
-        model_options,
-        index=0
-    )
-    
+    selected_model = st.radio("Wählen Sie das Modell aus:", model_options, index=0)
+
     # Sprachenauswahl mit Radiobuttons
     st.subheader("Sprache für generierte Fragen auswählen:")
     languages = {
@@ -549,160 +590,50 @@ def main():
         type=["pdf", "docx", "jpg", "jpeg", "png"], 
         accept_multiple_files=True
     )
-    
-    # Direktes Texteingabefeld
-    st.subheader("Oder geben Sie Ihren Text direkt ein:")
-    direct_text = st.text_area("Direkte Texteingabe:", height=200)
 
-    # Zusammenführen von Benutzerinput und Dateien
-    has_uploaded_files = len(uploaded_files) > 0
-    has_direct_text = direct_text.strip() != ""
-
-    if has_uploaded_files:
+    if uploaded_files:
         st.markdown("### 📂 Hochgeladene Dateien")
         for idx, uploaded_file in enumerate(uploaded_files):
             file_idx = idx + 1
-            with st.expander(f"📄 Datei {file_idx}: {uploaded_file.name}", expanded=False):
+            with st.expander(f"📄 Datei {file_idx}: {uploaded_file.name}"):
                 if uploaded_file.type == "application/pdf":
                     text_content, images = process_pdf(uploaded_file)
                     if text_content:
-                        st.text_area("Extrahierter Text:", value=text_content, height=200, disabled=True)
+                        with st.expander("📄 Extrahierter Text"):
+                            st.text_area("Extrahierter Text:", value=text_content, height=200, disabled=True)
+                        st.success("Text aus PDF extrahiert. Sie können ihn nun im folgenden Textfeld bearbeiten. PDFs, die länger als 5 Seiten sind, sollten gekürzt werden.")
                     elif images:
                         for img_idx, image in enumerate(images):
-                            st.image(image, caption=f'Seite {img_idx+1}', use_column_width=True)
+                            with st.expander(f"📷 Vorschau Seite {img_idx+1}"):
+                                st.image(image, caption=f'Seite {img_idx+1}', use_column_width=True)
+                        st.success("PDF in Bilder konvertiert. Sie können jetzt Fragen zu jeder Seite stellen.")
                 elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
                     text_content = extract_text_from_docx(uploaded_file)
-                    st.text_area("Extrahierter Text:", value=text_content, height=200, disabled=True)
+                    with st.expander("📄 Extrahierter Text"):
+                        st.text_area("Extrahierter Text:", value=text_content, height=200, disabled=True)
+                    st.success("Text erfolgreich extrahiert. Sie können ihn nun im folgenden Textbereich bearbeiten.")
                 elif uploaded_file.type.startswith('image/'):
                     image_content = Image.open(uploaded_file)
-                    st.image(image_content, caption=f'Hochgeladenes Bild {file_idx}: {uploaded_file.name}', use_column_width=True)
+                    with st.expander("📷 Hochgeladenes Bild"):
+                        st.image(image_content, caption=f'Hochgeladenes Bild {file_idx}: {uploaded_file.name}', use_column_width=True)
+                    st.success("Bild erfolgreich hochgeladen. Sie können jetzt Fragen zum Bild stellen.")
                 else:
                     st.error(f"Nicht unterstützter Dateityp für '{uploaded_file.name}'. Bitte laden Sie eine PDF, DOCX oder Bilddatei hoch.")
 
-    if has_direct_text:
-        with st.expander("📄 Direkte Texteingabe Vorschau", expanded=False):
-            st.write(direct_text)
-
-    # Benutzerdefiniertes CSS für hellblauen Hintergrund in Info-Callouts
-    st.markdown(
-        """
-        <style>
-        .custom-info {
-            background-color: #e7f3fe;
-            padding: 10px;
-            border-radius: 5px;
-            border-left: 6px solid #2196F3;
-        }
-        .custom-success {
-            background-color: #d4edda;
-            padding: 10px;
-            border-radius: 5px;
-            border-left: 6px solid #28a745;
-        }
-        .custom-warning {
-            background-color: #fff3cd;
-            padding: 10px;
-            border-radius: 5px;
-            border-left: 6px solid #ffc107;
-        }
-        </style>
-        """, unsafe_allow_html=True
-    )
-
-    # Eingabefelder für Lernziele
-    st.subheader("Lernziele auswählen:")
-    learning_goals = st.text_area("Lernziele (Optional):")
-
-    # Fragetypen auswählen
-    st.subheader("Fragetypen auswählen:")
-    selected_types = st.multiselect("Wählen Sie die Fragetypen zur Generierung aus:", MESSAGE_TYPES)
-
-    # Button zum Generieren von Fragen
-    if st.button("Fragen generieren"):
-        if not client:
-            st.error("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein, um Fragen zu generieren.")
-        elif not (has_uploaded_files or has_direct_text):
-            st.warning("Bitte geben Sie Text ein oder laden Sie eine Datei hoch.")
-        elif not selected_types:
-            st.warning("Bitte wählen Sie mindestens einen Fragetyp aus.")
-        else:
+        # Button zum Generieren von Fragen für alle Dateien
+        st.markdown("---")
+        if st.button("📥 Fragen generieren für alle Dateien"):
             with st.spinner("Generiere Fragen..."):
-                if has_direct_text and not has_uploaded_files:
-                    # Nur direkter Text eingegeben
-                    questions_text = generate_questions_for_content(
-                        text=direct_text,
-                        user_input=direct_text,
-                        learning_goals=learning_goals,
-                        selected_types=selected_types,
-                        selected_language=selected_language,
-                        selected_model=selected_model
-                    )
-                    # Anzeigen der generierten Fragen
-                    st.subheader("Generierter Inhalt:")
-                    st.write(questions_text)
-                    # Download-Button
-                    st.download_button(
-                        label="Generierte Fragen herunterladen",
-                        data=questions_text,
-                        file_name="direct_input_olat.txt",
-                        mime="text/plain"
-                    )
-                elif has_uploaded_files and not has_direct_text:
-                    # Nur Dateien hochgeladen
-                    zip_buffer = generate_all_questions(
-                        uploaded_files=uploaded_files,
-                        general_user_input="",  # Kann angepasst werden, wenn nötig
-                        general_learning_goals=learning_goals,
-                        selected_types=selected_types,
-                        selected_language=selected_language,
-                        selected_model=selected_model
-                    )
-                    if zip_buffer:
-                        if len(uploaded_files) > 1:
-                            st.success("Fragen erfolgreich generiert!")
-                            st.download_button(
-                                label="🗜️ Generierte Fragen als ZIP herunterladen",
-                                data=zip_buffer,
-                                file_name="generierte_fragen.zip",
-                                mime="application/zip"
-                            )
-                        else:
-                            # Einzelne Datei: Download der einzelnen Textdatei
-                            with zipfile.ZipFile(zip_buffer, 'r') as zip_ref:
-                                for file in zip_ref.namelist():
-                                    extracted_file = zip_ref.read(file)
-                                    st.success("Fragen erfolgreich generiert!")
-                                    st.download_button(
-                                        label="📝 Generierte Fragen herunterladen",
-                                        data=extracted_file,
-                                        file_name=file,
-                                        mime="text/plain"
-                                    )
-                elif has_uploaded_files and has_direct_text:
-                    # Sowohl Text eingegeben als auch Dateien hochgeladen
-                    # Generiere Fragen für Text
-                    questions_text = generate_questions_for_content(
-                        text=direct_text,
-                        user_input=direct_text,
-                        learning_goals=learning_goals,
-                        selected_types=selected_types,
-                        selected_language=selected_language,
-                        selected_model=selected_model
-                    )
-                    # Generiere Fragen für Dateien und packe in ZIP
-                    zip_buffer = generate_all_questions(
-                        uploaded_files=uploaded_files,
-                        general_user_input="",  # Kann angepasst werden, wenn nötig
-                        general_learning_goals=learning_goals,
-                        selected_types=selected_types,
-                        selected_language=selected_language,
-                        selected_model=selected_model
-                    )
-                    # Speichern der direkten Texteingabe in der ZIP
-                    if zip_buffer:
-                        with zipfile.ZipFile(zip_buffer, "a") as zip_file:
-                            zip_file.writestr("direct_input_olat.txt", questions_text)
-                        zip_buffer.seek(0)
+                zip_buffer = generate_all_questions(
+                    uploaded_files, 
+                    general_user_input, 
+                    general_learning_goals, 
+                    selected_types, 
+                    selected_language, 
+                    selected_model
+                )
+                if zip_buffer:
+                    if len(uploaded_files) > 1:
                         st.success("Fragen erfolgreich generiert!")
                         st.download_button(
                             label="🗜️ Generierte Fragen als ZIP herunterladen",
@@ -710,46 +641,20 @@ def main():
                             file_name="generierte_fragen.zip",
                             mime="application/zip"
                         )
-
-    # Funktion zur Verarbeitung von Bildern innerhalb von PDFs
-    def process_images(images, selected_language, selected_model):
-        """Verarbeitet hochgeladene Bilder und generiert Fragen."""
-        for idx, image in enumerate(images):
-            with st.expander(f"📸 Bild {idx+1}", expanded=False):
-                st.image(image, caption=f'Seite {idx+1}', use_column_width=True)
-
-                # Textbereich für Benutzereingaben und Lernziele
-                user_input = st.text_area(f"Geben Sie Ihre Frage oder Anweisungen für Seite {idx+1} ein:", key=f"text_area_{idx}")
-                learning_goals_page = st.text_area(f"Lernziele für Seite {idx+1} (Optional):", key=f"learning_goals_{idx}")
-
-                # Fragetypen auswählen
-                selected_types_page = st.multiselect(f"Wählen Sie die Fragetypen für Seite {idx+1} aus:", MESSAGE_TYPES, key=f"selected_types_{idx}")
-
-                # Button zum Generieren von Fragen für die Seite
-                if st.button(f"Fragen für Seite {idx+1} generieren", key=f"generate_button_{idx}"):
-                    # Fragen nur generieren, wenn Benutzereingaben und ausgewählte Fragetypen vorhanden sind
-                    if user_input and selected_types_page:
-                        questions = generate_questions_for_content(
-                            text="",
-                            user_input=user_input,
-                            learning_goals=learning_goals_page,
-                            selected_types=selected_types_page,
-                            selected_language=selected_language,
-                            selected_model=selected_model,
-                            image=image
-                        )
-                        # Anzeigen der generierten Fragen
-                        st.subheader("Generierter Inhalt:")
-                        st.write(questions)
-                        # Download-Button
-                        st.download_button(
-                            label="Generierte Fragen herunterladen",
-                            data=questions,
-                            file_name=f"seite_{idx+1}_olat.txt",
-                            mime="text/plain"
-                        )
                     else:
-                        st.warning(f"Bitte geben Sie Text ein und wählen Sie Fragetypen für Seite {idx+1} aus.")
+                        # Einzelne Datei: Download der einzelnen Textdatei mit angepasstem Namen
+                        with zipfile.ZipFile(zip_buffer, 'r') as zip_ref:
+                            for file in zip_ref.namelist():
+                                extracted_file = zip_ref.read(file)
+                                st.success("Fragen erfolgreich generiert!")
+                                st.download_button(
+                                    label="📝 Generierte Fragen herunterladen",
+                                    data=extracted_file,
+                                    file_name=file,  # {name_uploaded_file}_olat.txt
+                                    mime="text/plain"
+                                )
+    else:
+        st.info("Bitte laden Sie eine oder mehrere PDF, DOCX oder Bilddateien hoch, um mit der Generierung von Fragen zu beginnen.")
 
 if __name__ == "__main__":
     main()
