@@ -332,79 +332,154 @@ def transform_output(json_string):
         st.code(json_string)
         return "Fehler: Eingabe konnte nicht verarbeitet werden"
 
-def get_chatgpt_response(prompt, model, images=None, selected_language="English"):
-    """Ruft eine Antwort von OpenAI GPT ab und implementiert die Cache-Protokollierung."""
+def get_chatgpt_response(prompt, model, images=None, selected_language="English", reasoning_effort="medium"):
+    """Ruft eine Antwort von OpenAI ab und implementiert die Cache-Protokollierung."""
     if not client:
         st.error("Kein gültiger OpenAI-API-Schlüssel vorhanden. Bitte geben Sie Ihren API-Schlüssel ein.")
         return None
 
-    try:
-        # System-Prompt erstellen
-        system_prompt = (
-            """
-            Du bist ein Experte im Bildungsbereich...
-            [Your extensive system prompt remains here]
-            """
-        )
-        
-        # Build the user message content
-        user_content = [{"type": "text", "text": f"Generate questions in {selected_language}. {prompt}"}]
+    # System-Prompt, der für alle Modelle gilt
+    system_prompt = (
+        """
+        Du bist ein Experte im Bildungsbereich, spezialisiert auf die Erstellung von Testfragen und -antworten zu allen Themen, unter Einhaltung der Bloom's Taxonomy. Deine Aufgabe ist es, hochwertige Frage-Antwort-Sets basierend auf dem vom Benutzer bereitgestellten Material zu erstellen, wobei jede Frage einer spezifischen Ebene der Bloom's Taxonomy entspricht: Erinnern, Verstehen, Anwenden, Analysieren, Bewerten und Erstellen.
 
-        if images:
-            for image in images:
-                base64_image = process_image(image)
-                user_content.append(
-                    {
+        Der Benutzer wird entweder Text oder ein Bild hochladen. Deine Aufgaben sind wie folgt:
+
+        **Input-Analyse:**
+
+        - Du analysierst du den Inhalt sorgfältig, um die Schlüsselkonzepte und wichtigen Informationen zu verstehen.
+        - Falls vorhanden, du achtest auf Diagramme, Grafiken, Bilder oder Infografiken, um Bildungsinhalte abzuleiten.
+
+        **Fragen-Generierung nach Bloom-Ebene:**
+        Basierend auf dem analysierten Material generierst du Fragen über alle die folgenden Ebenen der Bloom's Taxonomy:
+
+        - **Erinnern**: Einfache, abrufbasierte Fragen.
+        - **Verstehen**: Fragen, die das Verständnis des Materials bewerten.
+        - **Anwenden**: Fragen, die die Anwendung des Wissens in praktischen Situationen erfordern.
+        """
+    )
+
+    try:
+        # ---- NEW: Logic for o4-mini Reasoning Model ----
+        if model == "o4-mini":
+            st.info(f"🧠 Rufe OpenAI Reasoning API (o4-mini) mit '{reasoning_effort}' Aufwand auf...")
+            
+            # Kombiniere System- und Benutzer-Prompt für das 'developer'-Feld
+            full_text_prompt = f"{system_prompt}\n\nGenerate questions in {selected_language}.\n\n{prompt}"
+            
+            developer_content = []
+            developer_content.append({
+                "type": "input_text",
+                "text": full_text_prompt
+            })
+
+            # Bilder hinzufügen (Format basierend auf gpt-4o angepasst)
+            if images:
+                for image in images:
+                    base64_image = process_image(image)
+                    developer_content.append({
                         "type": "image_url",
                         "image_url": {
                             "url": f"data:image/jpeg;base64,{base64_image}",
                             "detail": "low"
                         }
+                    })
+
+            # API-Aufruf gemäß dem bereitgestellten Snippet
+            response_obj = client.responses.create(
+                model="o4-mini",
+                input=[
+                    {
+                        "role": "developer",
+                        "content": developer_content
                     }
-                )
+                ],
+                reasoning={
+                    "effort": reasoning_effort
+                },
+                text={"format": {"type": "text"}},
+                tools=[],
+                store=False
+            )
 
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_content}
-        ]
+            # Antwort extrahieren, basierend auf der Snippet-Struktur
+            assistant_message = None
+            if hasattr(response_obj, 'input') and isinstance(response_obj.input, list):
+                for item in response_obj.input:
+                    if hasattr(item, 'role') and item.role == "assistant":
+                        assistant_message = item
+                        break
+            
+            if assistant_message and hasattr(assistant_message, 'content') and assistant_message.content:
+                return assistant_message.content[0].text
+            else:
+                st.error("Konnte keine gültige Antwort vom o4-mini Modell finden.")
+                logging.error(f"Unerwartete o4-mini Antwortstruktur: {response_obj}")
+                return None
 
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            max_tokens=15000,  # Adjusted for modern models
-            temperature=0.6
-        )
-        
-        # --- START of OpenAI-Side Caching Logic ---
-        if response.usage:
-            prompt_tokens = response.usage.prompt_tokens
-            completion_tokens = response.usage.completion_tokens
-            cache_info_str = ""
-            
-            prompt_details = getattr(response.usage, 'prompt_tokens_details', None)
-            
-            if prompt_details and isinstance(prompt_details, dict):
-                cached_tokens = prompt_details.get('cached_tokens', 0)
-                if cached_tokens and prompt_tokens > 0:
-                    cache_percentage = (cached_tokens / prompt_tokens * 100)
-                    cache_info_str = f" (Cached={cached_tokens}, {cache_percentage:.1f}%)"
-                elif cached_tokens:
-                    cache_info_str = f" (Cached={cached_tokens})"
-            
-            # Display token usage and cache info
-            st.info(f"📊 Token Usage: Prompt={prompt_tokens}{cache_info_str}, Completion={completion_tokens}")
-            logging.info(f"API Call Token Usage: Prompt={prompt_tokens}{cache_info_str}, Completion={completion_tokens}")
+        # ---- EXISTING: Logic for Chat Completion Models (gpt-4o, etc.) ----
         else:
-            st.warning("Token usage details not available in the API response.")
-        # --- END of OpenAI-Side Caching Logic ---
-        
-        return response.choices[0].message.content
+            user_content = [{"type": "text", "text": f"Generate questions in {selected_language}. {prompt}"}]
+
+            if images:
+                for image in images:
+                    base64_image = process_image(image)
+                    user_content.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}",
+                                "detail": "low"
+                            }
+                        }
+                    )
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
+            ]
+
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=4096, # Adjusted for modern models, 15000 is very high
+                temperature=0.6
+            )
+            
+            # --- START of OpenAI-Side Caching Logic ---
+            if response.usage:
+                prompt_tokens = response.usage.prompt_tokens
+                completion_tokens = response.usage.completion_tokens
+                cache_info_str = ""
+                
+                # Note: 'prompt_tokens_details' is not a standard attribute, might be from a beta feature.
+                # Using getattr to prevent errors if it doesn't exist.
+                prompt_details = getattr(response.usage, 'prompt_tokens_details', None)
+                
+                if prompt_details and isinstance(prompt_details, dict):
+                    cached_tokens = prompt_details.get('cached_tokens', 0)
+                    if cached_tokens and prompt_tokens > 0:
+                        cache_percentage = (cached_tokens / prompt_tokens * 100)
+                        cache_info_str = f" (Cached={cached_tokens}, {cache_percentage:.1f}%)"
+                    elif cached_tokens:
+                        cache_info_str = f" (Cached={cached_tokens})"
+                
+                # Display token usage and cache info
+                st.info(f"📊 Token Usage: Prompt={prompt_tokens}{cache_info_str}, Completion={completion_tokens}")
+                logging.info(f"API Call Token Usage: Prompt={prompt_tokens}{cache_info_str}, Completion={completion_tokens}")
+            else:
+                st.warning("Token usage details not available in the API response.")
+            # --- END of OpenAI-Side Caching Logic ---
+            
+            return response.choices[0].message.content
+
     except Exception as e:
         st.error(f"Fehler bei der Kommunikation mit der OpenAI API: {e}")
         logging.error(f"Fehler bei der Kommunikation mit der OpenAI API: {e}")
         return None
 
-def generate_questions(user_input, learning_goals, selected_types, images, selected_language, selected_model):
+
+def generate_questions(user_input, learning_goals, selected_types, images, selected_language, selected_model, reasoning_effort):
     """Generiert Fragen und implementiert Anwendungs-seitiges Caching."""
     if not client:
         st.error("Ein gültiger OpenAI-API-Schlüssel ist erforderlich, um Fragen zu generieren.")
@@ -425,7 +500,11 @@ def generate_questions(user_input, learning_goals, selected_types, images, selec
     content_to_hash = user_input
     if images:
         for img in images:
-            content_to_hash += process_image(img) # process_image returns b64 string
+            # Use image's raw bytes for hashing if available, otherwise process it
+            try:
+                content_to_hash += img.tobytes()
+            except:
+                content_to_hash += process_image(img) # process_image returns b64 string
     current_content_hash = hashlib.md5(content_to_hash.encode()).hexdigest()
 
     # If the source content has changed, clear the old cache for this specific context
@@ -450,8 +529,14 @@ def generate_questions(user_input, learning_goals, selected_types, images, selec
                 prompt_template = read_prompt_from_md(msg_type)
                 full_prompt = f"{prompt_template}\n\nBenutzereingabe: {user_input}\n\nLernziele: {learning_goals}"
                 try:
-                    # Pass the list of images to the API call
-                    response = get_chatgpt_response(full_prompt, model=selected_model, images=images, selected_language=selected_language)
+                    # Pass the list of images and reasoning effort to the API call
+                    response = get_chatgpt_response(
+                        full_prompt, 
+                        model=selected_model, 
+                        images=images, 
+                        selected_language=selected_language,
+                        reasoning_effort=reasoning_effort
+                    )
                     if response:
                         # Store successful response in cache
                         st.session_state[cache_key][msg_type] = response
@@ -516,8 +601,19 @@ def process_pdf(file):
 def main():
     """Hauptfunktion für die Streamlit-App."""
     st.subheader("Modell für die Generierung auswählen:")
-    model_options = ["gpt-4o", "gpt-4.1"]
+    model_options = ["gpt-4o", "gpt-4.1", "o4-mini"]
     selected_model = st.selectbox("Wählen Sie das Modell aus:", model_options, index=0)
+
+    # NEW: Conditionally show reasoning effort selection for o4-mini
+    reasoning_effort = "medium"  # Default value
+    if selected_model == "o4-mini":
+        st.subheader("Reasoning Effort (für o4-mini)")
+        effort_options = ["low", "medium", "high"]
+        reasoning_effort = st.selectbox(
+            "Wählen Sie den Reasoning Effort:",
+            effort_options,
+            index=1  # Default to medium
+        )
 
     st.subheader("Sprache für generierte Fragen auswählen:")
     languages = {
@@ -553,10 +649,14 @@ def main():
             st.error("Bitte laden Sie maximal 10 Bilder hoch.")
             return
         
-        is_multimedia_upload = len(uploaded_files) > 1
         has_doc = any(f.name.lower().endswith(('.pdf', '.docx')) for f in uploaded_files)
-        if is_multimedia_upload and has_doc:
+        has_img = any(f.type.startswith('image/') for f in uploaded_files)
+        
+        if has_doc and has_img and len(uploaded_files) > 1:
             st.error("Sie können entweder eine einzelne PDF/DOCX-Datei oder mehrere Bilddateien hochladen, aber nicht mischen.")
+            return
+        if len([f for f in uploaded_files if has_doc]) > 1:
+            st.error("Bitte laden Sie nur eine einzelne PDF- oder DOCX-Datei hoch.")
             return
 
         # Process files into text and/or images
@@ -607,7 +707,8 @@ def main():
                 selected_types, 
                 image_content_list, 
                 selected_language, 
-                selected_model
+                selected_model,
+                reasoning_effort  # Pass the selected effort
             )
         elif not user_input and not image_content_list:
             st.warning("Bitte geben Sie Text ein oder laden Sie eine Datei hoch.")
