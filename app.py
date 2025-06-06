@@ -184,9 +184,11 @@ MESSAGE_TYPES = [
 
 @st.cache_data
 def read_prompt_from_md(filename):
-    """Liest den Prompt aus einer Markdown-Datei und speichert das Ergebnis zwischen."""
-    with open(f"{filename}.md", "r", encoding="utf-8") as file:
-        return file.read()
+    """Liest den Prompt aus einer Markdown-Datei und speichert das Ergebnis zwischen."""
+    # Construct the correct path to the markdown file inside the 'prompts' folder
+    file_path = os.path.join("prompts", f"{filename}.md")
+    with open(file_path, "r", encoding="utf-8") as file:
+        return file.read()
 
 def process_image(_image):
     """Verarbeitet und verkleinert ein Bild, um den Speicherverbrauch zu reduzieren."""
