@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📝 OLAT Fragen Generator mit Gemini</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .gemini-button {
+            background: linear-gradient(to right, #4c82fb, #8a3ffc);
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div class="flex flex-col lg:flex-row min-h-screen">
+        <!-- Sidebar -->
+        <aside class="w-full lg:w-1/3 xl:w-1/4 bg-white p-6 border-r border-gray-200 shadow-lg">
+            <h1 class="text-2xl font-bold mb-6 text-gray-800">📝 Fragen Generator</h1>
+
+            <div class="space-y-6">
+                <!-- API Key Input -->
+                <div>
+                    <label for="api_key" class="block text-sm font-medium text-gray-700">Gemini API Schlüssel</label>
+                    <input type="password" id="api_key" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Ihr API-Schlüssel">
+                </div>
+                
+                <!-- Model Selection -->
+                <div>
+                    <label for="model-select" class="block text-sm font-medium text-gray-700">Gemini Modell</label>
+                    <select id="model-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <option value="gemini-2.0-flash" selected>Gemini 2.0 Flash (Schnell)</option>
+                        <option value="gemini-2.5-flash-preview-05-20">Gemini 2.5 Flash (Vorschau)</option>
+                        <option value="gemini-2.5-pro-preview-06-05">Gemini 2.5 Pro (Vorschau)</option>
+                    </select>
+                </div>
+
+                <!-- File Uploader -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Bilder hochladen (bis zu 5)</label>
+                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                        <div class="space-y-1 text-center">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                            <div class="flex text-sm text-gray-600">
+                                <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
+                                    <span>Dateien auswählen</span>
+                                    <input id="file-upload" name="file-upload" type="file" class="sr-only" accept="image/png, image/jpeg" multiple>
+                                </label>
+                                <p class="pl-1">oder hierher ziehen</p>
+                            </div>
+                            <p class="text-xs text-gray-500">PNG, JPG bis 10MB</p>
+                        </div>
+                    </div>
+                </div>
+                 <div id="image-previews" class="grid grid-cols-3 gap-2"></div>
+
+
+                <!-- Language Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Sprache der Fragen</label>
+                    <select id="language" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <option value="German" selected>Deutsch</option>
+                        <option value="English">Englisch</option>
+                        <option value="French">Französisch</option>
+                        <option value="Italian">Italienisch</option>
+                        <option value="Spanish">Spanisch</option>
+                    </select>
+                </div>
+
+                <!-- Cognitive Level Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Zielniveau</label>
+                    <select id="zielniveau" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <option value="A2 (elementar / Primarstufe, frühe Sek I)">A2 (elementar / Primarstufe, frühe Sek I)</option>
+                        <option value="B1 (untere Sek II, Berufsschule, Realschule)">B1 (untere Sek II, Berufsschule, Realschule)</option>
+                        <option value="B2 (obere Sek II, Maturität, Bachelorbeginn)" selected>B2 (obere Sek II, Maturität, Bachelorbeginn)</option>
+                        <option value="C1 (Bachelor/Master, Hochschulreife)">C1 (Bachelor/Master, Hochschulreife)</option>
+                        <option value="C2 (Master/Expertenniveau)">C2 (Master/Expertenniveau)</option>
+                    </select>
+                </div>
+
+                <!-- Question Type Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Fragetypen</label>
+                    <div id="question-types" class="mt-2 grid grid-cols-2 gap-2">
+                         <!-- Checkboxes werden hier per JS eingefügt -->
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="w-full lg:w-2/3 xl:w-3/4 p-6 lg:p-8 flex flex-col">
+            <!-- Text Input Area -->
+            <div class="flex-grow flex flex-col">
+                <label for="user_input" class="block text-sm font-medium text-gray-700">Geben Sie hier Ihren Text ein oder fügen Sie den Inhalt Ihrer Dokumente ein:</label>
+                <textarea id="user_input" rows="15" class="mt-1 block w-full p-3 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 flex-grow"></textarea>
+            </div>
+            
+            <!-- Gemini Features -->
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                 <textarea id="learning_goals" rows="4" class="col-span-1 md:col-span-2 mt-1 block w-full p-3 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Optionale Lernziele... oder lassen Sie sich welche vorschlagen!"></textarea>
+                 <button id="generate-goals-btn" class="gemini-button text-white font-bold py-2 px-4 rounded-md h-full flex items-center justify-center text-center shadow-lg hover:opacity-90 transition-opacity">
+                    ✨ Lernziel-Assistent
+                 </button>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-6 flex flex-col sm:flex-row gap-4">
+                <button id="generate-questions-btn" class="flex-1 bg-indigo-600 text-white font-bold py-3 px-6 rounded-md shadow-lg hover:bg-indigo-700 transition-colors flex items-center justify-center">
+                    Fragen generieren
+                </button>
+                 <button id="explore-topics-btn" class="flex-1 gemini-button text-white font-bold py-3 px-6 rounded-md shadow-lg hover:opacity-90 transition-opacity flex items-center justify-center">
+                    ✨ Themen-Explorer
+                 </button>
+            </div>
+            
+            <!-- Output Area -->
+            <div id="output-container" class="mt-8 flex-grow">
+                <h2 class="text-xl font-semibold mb-4 text-gray-800">Generierter Inhalt</h2>
+                <div id="spinner" class="hidden mx-auto my-8 loader"></div>
+                <div id="results" class="bg-white p-4 rounded-md shadow-sm border border-gray-200 min-h-[200px] overflow-x-hidden">
+                    <div id="topic-explorer-results" class="mb-6"></div>
+                    <pre id="all-responses" class="whitespace-pre-wrap text-sm text-gray-700"></pre>
+                </div>
+                 <button id="download-btn" class="mt-4 bg-green-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-green-700 transition-colors hidden">
+                    Alle Antworten herunterladen
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Elements ---
+            const apiKeyInput = document.getElementById('api_key');
+            const modelSelect = document.getElementById('model-select'); // New element
+            const fileUpload = document.getElementById('file-upload');
+            const imagePreviews = document.getElementById('image-previews');
+            const languageSelect = document.getElementById('language');
+            const zielniveauSelect = document.getElementById('zielniveau');
+            const userInput = document.getElementById('user_input');
+            const learningGoalsInput = document.getElementById('learning_goals');
+            const generateGoalsBtn = document.getElementById('generate-goals-btn');
+            const generateQuestionsBtn = document.getElementById('generate-questions-btn');
+            const exploreTopicsBtn = document.getElementById('explore-topics-btn');
+            const questionTypesContainer = document.getElementById('question-types');
+            const spinner = document.getElementById('spinner');
+            const resultsContainer = document.getElementById('results');
+            const allResponsesContainer = document.getElementById('all-responses');
+            const topicExplorerResultsContainer = document.getElementById('topic-explorer-results');
+            const downloadBtn = document.getElementById('download-btn');
+
+            let uploadedImages = []; // To store base64 images
+            const promptCache = {}; // Cache for fetched prompt files
+
+            // --- Constants & Config ---
+            const QUESTION_TYPES = [
+                "single_choice", "multiple_choice1", "multiple_choice2",
+                "multiple_choice3", "kprim", "truefalse", "draganddrop", "inline_fib"
+            ];
+            
+            const ZIELNIVEAU_PROMPTS = {
+                "A2 (elementar / Primarstufe, frühe Sek I)": "🟢 A2 (elementar / Primarstufe, frühe Sek I)\nVerwende einfache Satzstrukturen und grundlegenden Wortschatz...",
+                "B1 (untere Sek II, Berufsschule, Realschule)": "🔵 B1 (untere Sek II, Berufsschule, Realschule)\nVerwende alltagsnahes, aber anspruchsvolleres Vokabular...",
+                "B2 (obere Sek II, Maturität, Bachelorbeginn)": "🟡 B2 (obere Sek II, Maturität, Bachelorbeginn)\nVerwende akademisch orientierten Wortschatz...",
+                "C1 (Bachelor/Master, Hochschulreife)": "🟠 C1 (Bachelor/Master, Hochschulreife)\nVerwende komplexe Satzstrukturen...",
+                "C2 (Master/Expertenniveau)": "🔴 C2 (Master/Expertenniveau)\nVerwende präzise, abstrakte und komplexe Sprache..."
+            };
+
+            // --- Initialization ---
+            function initializeQuestionTypes() {
+                QUESTION_TYPES.forEach(type => {
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center';
+                    const checkbox = document.createElement('input');
+                    checkbox.id = `type-${type}`;
+                    checkbox.name = 'question_type';
+                    checkbox.type = 'checkbox';
+                    checkbox.value = type;
+                    checkbox.className = 'h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500';
+                    const label = document.createElement('label');
+                    label.htmlFor = `type-${type}`;
+                    label.className = 'ml-2 block text-sm text-gray-900';
+                    label.textContent = type.replace(/_/g, ' ').replace(/\d/g, m => ' ' + m);
+                    div.appendChild(checkbox);
+                    div.appendChild(label);
+                    questionTypesContainer.appendChild(div);
+                });
+            }
+            initializeQuestionTypes();
+
+            // --- Event Listeners ---
+            fileUpload.addEventListener('change', handleImageUpload);
+            generateGoalsBtn.addEventListener('click', handleGenerateGoals);
+            generateQuestionsBtn.addEventListener('click', handleGenerateQuestions);
+            exploreTopicsBtn.addEventListener('click', handleExploreTopics);
+            downloadBtn.addEventListener('click', handleDownload);
+
+
+            // --- Functions ---
+            
+            async function fetchPromptForType(type) {
+                if (promptCache[type]) {
+                    return promptCache[type];
+                }
+                const path = `prompts/${type}.md`;
+                try {
+                    const response = await fetch(path);
+                    if (!response.ok) {
+                        throw new Error(`Konnte die Prompt-Datei nicht laden: ${response.statusText}`);
+                    }
+                    const promptText = await response.text();
+                    promptCache[type] = promptText; // Cache the result
+                    return promptText;
+                } catch (error) {
+                    console.error(`Fehler beim Abrufen der Prompt-Datei für ${type}:`, error);
+                    alert(`Konnte die Anweisungen für den Fragetyp "${type}" nicht laden. Stellen Sie sicher, dass die Datei ${path} existiert.`);
+                    return null;
+                }
+            }
+
+
+            function handleImageUpload(event) {
+                uploadedImages = [];
+                imagePreviews.innerHTML = '';
+                const files = event.target.files;
+
+                if (files.length > 5) {
+                    alert('Bitte wählen Sie maximal 5 Bilder aus.');
+                    return;
+                }
+
+                Array.from(files).forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        uploadedImages.push({ inlineData: { mimeType: file.type, data: e.target.result.split(',')[1] } });
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.className = 'h-20 w-20 object-cover rounded-md';
+                        imagePreviews.appendChild(img);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            async function callGeminiAPI(promptParts) {
+                const apiKey = apiKeyInput.value;
+                if (!apiKey) {
+                    alert("Bitte geben Sie Ihren Gemini API Schlüssel ein.");
+                    return null;
+                }
+                
+                // Get selected model and construct URL dynamically
+                const selectedModel = modelSelect.value;
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+                
+                const payload = {
+                  contents: [{ role: "user", parts: promptParts }],
+                  generationConfig: { temperature: 0.6, maxOutputTokens: 8192 }
+                };
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) {
+                        const errorBody = await response.json();
+                        throw new Error(`API Fehler: ${response.status} ${response.statusText} - ${errorBody.error.message}`);
+                    }
+                    const data = await response.json();
+                    
+                    if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts.length > 0) {
+                         return data.candidates[0].content.parts[0].text;
+                    } else {
+                        console.warn("Gemini-Antwort war leer oder blockiert.", data);
+                        return `// Keine gültige Antwort vom Modell erhalten. Bitte überprüfen Sie die Ausgabe in der Entwicklerkonsole.`;
+                    }
+                } catch (error) {
+                    console.error("Fehler bei der Gemini API-Anfrage:", error);
+                    alert(`Ein Fehler ist aufgetreten: ${error.message}`);
+                    return null;
+                }
+            }
+            
+            async function handleGenerateGoals() {
+                const text = userInput.value.trim();
+                if (!text && uploadedImages.length === 0) {
+                    alert("Bitte geben Sie Text ein oder laden Sie Bilder hoch, um Lernziele zu generieren.");
+                    return;
+                }
+                showSpinner(true, 'Lernziele werden generiert...');
+                const prompt = `Analysiere den folgenden Inhalt und generiere 3-5 prägnante, aussagekräftige Lernziele für Lernende auf dem Niveau "${zielniveauSelect.value}". Formuliere die Ziele als "Die Lernenden können...". Gib nur die Liste der Lernziele aus.`;
+                let promptParts = [{ text: prompt }, {text: `\n\n--- INHALT ---\n${text}`}];
+                promptParts.push(...uploadedImages);
+                const result = await callGeminiAPI(promptParts);
+                if (result) learningGoalsInput.value = result;
+                showSpinner(false);
+            }
+
+            async function handleExploreTopics() {
+                const text = userInput.value.trim();
+                 if (!text && uploadedImages.length === 0) {
+                    alert("Bitte geben Sie Text ein oder laden Sie Bilder hoch, um Themen zu erkunden.");
+                    return;
+                }
+                showSpinner(true, 'Verwandte Themen werden erkundet...');
+                topicExplorerResultsContainer.innerHTML = '';
+                const prompt = `Analysiere den folgenden Inhalt. Schlage 3 bis 5 verwandte Themen vor. Formatiere deine Antwort als HTML mit <h4> Überschriften und <p> Paragraphen.`;
+                let promptParts = [{ text: prompt }, {text: `\n\n--- INHALT ---\n${text}`}];
+                promptParts.push(...uploadedImages);
+                const result = await callGeminiAPI(promptParts);
+                if(result) {
+                    topicExplorerResultsContainer.innerHTML = `<h3 class="text-lg font-semibold mb-2 text-indigo-700">✨ Themen-Explorer Ergebnisse</h3><div class="p-4 bg-indigo-50 rounded-md border border-indigo-200">${result}</div>`;
+                }
+                showSpinner(false);
+            }
+
+            async function handleGenerateQuestions() {
+                const text = userInput.value.trim();
+                const learningGoals = learningGoalsInput.value.trim();
+                const selectedTypes = Array.from(document.querySelectorAll('input[name="question_type"]:checked')).map(cb => cb.value);
+
+                if ((!text && uploadedImages.length === 0) || selectedTypes.length === 0) {
+                    alert("Bitte geben Sie Text ein (oder laden Bilder hoch) und wählen Sie mindestens einen Fragetyp aus.");
+                    return;
+                }
+                
+                showSpinner(true, 'Fragen werden generiert...');
+                allResponsesContainer.textContent = '';
+                topicExplorerResultsContainer.innerHTML = '';
+                let allGeneratedResponses = '';
+
+                for (const type of selectedTypes) {
+                    const basePrompt = await fetchPromptForType(type);
+                    if (!basePrompt) continue;
+
+                    const fullPrompt = assembleFullPrompt(basePrompt, text, learningGoals);
+                    let promptParts = [{ text: fullPrompt }];
+                    if (uploadedImages.length > 0) promptParts.push(...uploadedImages);
+                    
+                    const result = await callGeminiAPI(promptParts);
+
+                    if (result) {
+                        allGeneratedResponses += result + '\n\n---\n\n';
+                    } else {
+                        allGeneratedResponses += `## FEHLER FÜR ${type.toUpperCase()} ##\nDie KI hat keine Antwort für diesen Fragetyp generiert.\n\n---\n\n`;
+                    }
+                }
+                
+                allResponsesContainer.textContent = allGeneratedResponses;
+                downloadBtn.style.display = allGeneratedResponses ? 'block' : 'none';
+                showSpinner(false);
+            }
+
+            function assembleFullPrompt(basePrompt, text, learningGoals) {
+                const language = languageSelect.value;
+                const zielniveau = ZIELNIVEAU_PROMPTS[zielniveauSelect.value];
+                return `${basePrompt}\n\n## CONTEXT ##\nLanguage: ${language}\nZielniveau: ${zielniveau}\nLearning Goals: """${learningGoals}"""\n\n## MATERIAL ##\n"""${text}"""`;
+            }
+            
+            function handleDownload() {
+                const textToSave = allResponsesContainer.textContent;
+                const blob = new Blob([textToSave], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'olat_fragen.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+            
+            function showSpinner(show, text = '') {
+                spinner.style.display = show ? 'block' : 'none';
+                resultsContainer.style.display = show ? 'none' : 'block';
+                if(show) spinner.setAttribute('title', text);
+            }
+        });
+    </script>
+</body>
+</html>
