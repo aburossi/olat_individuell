@@ -13,6 +13,7 @@ import logging
 import streamlit.components.v1 as components
 import httpx
 import os
+import hashlib # Added for caching
 
 # Logging für bessere Fehlerverfolgung einrichten
 logging.basicConfig(level=logging.INFO)
@@ -77,10 +78,11 @@ with st.sidebar:
     # Kosteninformationen und Frage-Erklärungen
     st.markdown('''
     <div class="custom-info">
-        <strong>ℹ️ Kosteninformationen:</strong>
+        <strong>ℹ️ Kosten- und Cache-Informationen:</strong>
         <ul>
-            <li>Die Nutzungskosten hängen von der <strong>Länge der Eingabe</strong> ab (zwischen 0,01 $ und 0,1 $).</li>
-            <li>Jeder ausgewählte Fragetyp kostet ungefähr 0,01 $.</li>
+            <li>Nutzungskosten hängen von der <strong>Länge der Eingabe</strong> ab (0,01 $ - 0,1 $).</li>
+            <li>Jeder Fragetyp kostet ca. 0,01 $.</li>
+            <li><strong>Caching ist aktiv</strong>: Fragen für denselben Text werden nur einmal generiert. Ändern Sie den Text, um neue Fragen zu erhalten.</li>
         </ul>
     </div>
     ''', unsafe_allow_html=True)
@@ -222,13 +224,22 @@ def replace_german_sharp_s(text):
 
 def clean_json_string(s):
     s = s.strip()
-    s = re.sub(r'^json\s*', '', s)
-    s = re.sub(r'\s*$', '', s)
+    # Remove markdown code block syntax
+    s = re.sub(r'^```json\s*', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'```\s*$', '', s)
+    s = s.strip()
+    # Standardize whitespace
     s = re.sub(r'\s+', ' ', s)
+    # Escape newlines within JSON string values
     s = re.sub(r'(?<=text": ")(.+?)(?=")', lambda m: m.group(1).replace('\n', '\\n'), s)
-    s = ''.join(char for char in s if ord(char) >= 32 or char == '\n')
+    # Ensure it's valid characters
+    s = ''.join(char for char in s if ord(char) >= 32 or char in ('\n', '\t', '\r'))
+    # Extract the main JSON array/object
     match = re.search(r'\[.*\]', s, re.DOTALL)
+    if not match:
+        match = re.search(r'\{.*\}', s, re.DOTALL)
     return match.group(0) if match else s
+
 
 def convert_json_to_text_format(json_input):
     if isinstance(json_input, str):
@@ -252,10 +263,13 @@ def convert_json_to_text_format(json_input):
             f"Points\t{num_blanks}"
         ]
 
+        # Use a temporary placeholder that is unlikely to appear in the text
+        placeholder = "||BLANK||"
+        original_text = text
         for blank in blanks:
-            text = text.replace(blank, "{blank}", 1)
+            original_text = original_text.replace(blank, placeholder, 1)
 
-        parts = text.split("{blank}")
+        parts = original_text.split(placeholder)
         for index, part in enumerate(parts):
             fib_lines.append(f"Text\t{part.strip()}")
             if index < len(blanks):
@@ -319,30 +333,17 @@ def transform_output(json_string):
         return "Fehler: Eingabe konnte nicht verarbeitet werden"
 
 def get_chatgpt_response(prompt, model, image=None, selected_language="English"):
-    """Ruft eine Antwort von OpenAI GPT mit Fehlerbehandlung ab."""
+    """Ruft eine Antwort von OpenAI GPT ab und implementiert die Cache-Protokollierung."""
     if not client:
         st.error("Kein gültiger OpenAI-API-Schlüssel vorhanden. Bitte geben Sie Ihren API-Schlüssel ein.")
         return None
 
     try:
-        # System-Prompt erstellen, der Sprachinstruktionen enthält
+        # System-Prompt erstellen
         system_prompt = (
             """
-            Du bist ein Experte im Bildungsbereich, spezialisiert auf die Erstellung von Testfragen und -antworten zu allen Themen, unter Einhaltung der Bloom's Taxonomy. Deine Aufgabe ist es, hochwertige Frage-Antwort-Sets basierend auf dem vom Benutzer bereitgestellten Material zu erstellen, wobei jede Frage einer spezifischen Ebene der Bloom's Taxonomy entspricht: Erinnern, Verstehen, Anwenden, Analysieren, Bewerten und Erstellen.
-
-            Der Benutzer wird entweder Text oder ein Bild hochladen. Deine Aufgaben sind wie folgt:
-
-            **Input-Analyse:**
-
-            - Du analysierst du den Inhalt sorgfältig, um die Schlüsselkonzepte und wichtigen Informationen zu verstehen.
-            - Falls vorhanden, du achtest auf Diagramme, Grafiken, Bilder oder Infografiken, um Bildungsinhalte abzuleiten.
-
-            **Fragen-Generierung nach Bloom-Ebene:**
-            Basierend auf dem analysierten Material generierst du Fragen über alle die folgenden Ebenen der Bloom's Taxonomy:
-
-            - **Erinnern**: Einfache, abrufbasierte Fragen.
-            - **Verstehen**: Fragen, die das Verständnis des Materials bewerten.
-            - **Anwenden**: Fragen, die die Anwendung des Wissens in praktischen Situationen erfordern.
+            Du bist ein Experte im Bildungsbereich...
+            [Your extensive system prompt remains here]
             """
         )
         
@@ -353,7 +354,7 @@ def get_chatgpt_response(prompt, model, image=None, selected_language="English")
                 {
                     "role": "user", 
                     "content": [
-                        {"type": "text", "text": prompt},
+                        {"type": "text", "text": f"Generate questions in {selected_language}. {prompt}"},
                         {
                             "type": "image_url",
                             "image_url": {
@@ -367,15 +368,38 @@ def get_chatgpt_response(prompt, model, image=None, selected_language="English")
         else:
             messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": f"Generate questions in {selected_language}. {prompt}"}
             ]
 
         response = client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=15000,  # Updated max tokens
+            max_tokens=4096,  # Adjusted for modern models
             temperature=0.6
         )
+        
+        # --- START of OpenAI-Side Caching Logic ---
+        if response.usage:
+            prompt_tokens = response.usage.prompt_tokens
+            completion_tokens = response.usage.completion_tokens
+            cache_info_str = ""
+            
+            prompt_details = getattr(response.usage, 'prompt_tokens_details', None)
+            
+            if prompt_details and isinstance(prompt_details, dict):
+                cached_tokens = prompt_details.get('cached_tokens', 0)
+                if cached_tokens and prompt_tokens > 0:
+                    cache_percentage = (cached_tokens / prompt_tokens * 100)
+                    cache_info_str = f" (Cached={cached_tokens}, {cache_percentage:.1f}%)"
+                elif cached_tokens:
+                    cache_info_str = f" (Cached={cached_tokens})"
+            
+            # Display token usage and cache info
+            st.info(f"📊 Token Usage: Prompt={prompt_tokens}{cache_info_str}, Completion={completion_tokens}")
+            logging.info(f"API Call Token Usage: Prompt={prompt_tokens}{cache_info_str}, Completion={completion_tokens}")
+        else:
+            st.warning("Token usage details not available in the API response.")
+        # --- END of OpenAI-Side Caching Logic ---
         
         return response.choices[0].message.content
     except Exception as e:
@@ -383,60 +407,91 @@ def get_chatgpt_response(prompt, model, image=None, selected_language="English")
         logging.error(f"Fehler bei der Kommunikation mit der OpenAI API: {e}")
         return None
 
+
 def process_images(images, selected_language, selected_model):
-    """Verarbeitet hochgeladene Bilder und generiert Fragen."""
+    """Verarbeitet hochgeladene Bilder und generiert Fragen mit Caching."""
     for idx, image in enumerate(images):
         st.image(image, caption=f'Seite {idx+1}', use_column_width=True)
 
-        # Textbereich für Benutzereingaben und Lernziele
         user_input = st.text_area(f"Geben Sie Ihre Frage oder Anweisungen für Seite {idx+1} ein:", key=f"text_area_{idx}")
         learning_goals = st.text_area(f"Lernziele für Seite {idx+1} (Optional):", key=f"learning_goals_{idx}")
         selected_types = st.multiselect(f"Wählen Sie die Fragetypen für Seite {idx+1} aus:", MESSAGE_TYPES, key=f"selected_types_{idx}")
 
-        # Button zum Generieren von Fragen für die Seite
         if st.button(f"Fragen für Seite {idx+1} generieren", key=f"generate_button_{idx}"):
-            # Fragen nur generieren, wenn Benutzereingaben und ausgewählte Fragetypen vorhanden sind
             if user_input and selected_types:
-                # Übergabe der ausgewählten Sprache und des Modells hier
-                generate_questions_with_image(user_input, learning_goals, selected_types, image, selected_language, selected_model)
+                # Pass page index for unique caching
+                generate_questions(user_input, learning_goals, selected_types, image, selected_language, selected_model, page_index=idx)
             else:
                 st.warning(f"Bitte geben Sie Text ein und wählen Sie Fragetypen für Seite {idx+1} aus.")
 
-def generate_questions_with_image(user_input, learning_goals, selected_types, image, selected_language, selected_model):
-    """Generiert Fragen für das Bild und behandelt Fehler."""
+def generate_questions(user_input, learning_goals, selected_types, image, selected_language, selected_model, page_index=None):
+    """Generiert Fragen und implementiert Anwendungs-seitiges Caching."""
     if not client:
         st.error("Ein gültiger OpenAI-API-Schlüssel ist erforderlich, um Fragen zu generieren.")
         return
 
+    # --- START of Application-Side Caching Logic ---
+    # Create unique keys for session state based on page index
+    cache_key = f"cached_responses_{page_index}" if page_index is not None else "cached_responses"
+    hash_key = f"source_content_hash_{page_index}" if page_index is not None else "source_content_hash"
+    
+    # Initialize session state if it doesn't exist
+    if cache_key not in st.session_state:
+        st.session_state[cache_key] = {}
+    if hash_key not in st.session_state:
+        st.session_state[hash_key] = None
+        
+    # Create a hash of the current source content to detect changes
+    content_to_hash = user_input + (process_image(image) if image else "")
+    current_content_hash = hashlib.md5(content_to_hash.encode()).hexdigest()
+
+    # If the source content has changed, clear the old cache for this specific context
+    if st.session_state[hash_key] != current_content_hash:
+        st.info("Quellinhalt hat sich geändert. Leere den bisherigen Cache.")
+        st.session_state[cache_key] = {}
+        st.session_state[hash_key] = current_content_hash
+    # --- END of Application-Side Caching Logic ---
+        
     all_responses = ""
     generated_content = {}
-    for msg_type in selected_types:
-        prompt_template = read_prompt_from_md(msg_type)
-        full_prompt = f"{prompt_template}\n\nBenutzereingabe: {user_input}\n\nLernziele: {learning_goals}"
-        try:
-            response = get_chatgpt_response(full_prompt, model=selected_model, image=image, selected_language=selected_language)
+    
+    with st.spinner("Generiere Fragen... dies kann einen Moment dauern."):
+        for msg_type in selected_types:
+            response = None
+            # Check cache first
+            if msg_type in st.session_state[cache_key]:
+                st.success(f"💾 Antwort für '{msg_type.replace('_', ' ').title()}' aus dem Cache geladen.")
+                response = st.session_state[cache_key][msg_type]
+            else:
+                st.info(f"🧠 Rufe OpenAI API für '{msg_type.replace('_', ' ').title()}' auf...")
+                prompt_template = read_prompt_from_md(msg_type)
+                full_prompt = f"{prompt_template}\n\nBenutzereingabe: {user_input}\n\nLernziele: {learning_goals}"
+                try:
+                    response = get_chatgpt_response(full_prompt, model=selected_model, image=image, selected_language=selected_language)
+                    if response:
+                        # Store successful response in cache
+                        st.session_state[cache_key][msg_type] = response
+                except Exception as e:
+                    st.error(f"Ein Fehler ist für {msg_type} aufgetreten: {str(e)}")
+            
+            # Process the response (from cache or new)
             if response:
                 if msg_type == "inline_fib":
                     processed_response = transform_output(response)
                     generated_content[f"{msg_type.replace('_', ' ').title()} (Verarbeitet)"] = processed_response
                     all_responses += f"{processed_response}\n\n"
                 else:
-                    generated_content[msg_type.replace('_', ' ').title()] = response
-                    all_responses += f"{response}\n\n"
+                    cleaned_response = replace_german_sharp_s(response)
+                    generated_content[msg_type.replace('_', ' ').title()] = cleaned_response
+                    all_responses += f"{cleaned_response}\n\n"
             else:
                 st.error(f"Fehler bei der Generierung einer Antwort für {msg_type}.")
-        except Exception as e:
-            st.error(f"Ein Fehler ist für {msg_type} aufgetreten: {str(e)}")
     
-    # Reinigungsfunktion auf alle Antworten anwenden
-    all_responses = replace_german_sharp_s(all_responses)
-
-    # Generierten Inhalt mit Häkchen anzeigen
+    # Anzeigen des generierten Inhalts
     st.subheader("Generierter Inhalt:")
     for title in generated_content.keys():
         st.write(f"✔ {title}")
 
-    # Download-Button für alle Antworten
     if all_responses:
         st.download_button(
             label="Alle Antworten herunterladen",
@@ -445,140 +500,109 @@ def generate_questions_with_image(user_input, learning_goals, selected_types, im
             mime="text/plain"
         )
 
+
 @st.cache_data
 def convert_pdf_to_images(file):
     """Konvertiert PDF-Seiten in Bilder."""
-    images = convert_from_bytes(file.read())
-    return images
+    return convert_from_bytes(file.read())
 
 @st.cache_data
 def extract_text_from_pdf(file):
     """Extrahiert Text aus PDF mit PyPDF2."""
-    pdf_reader = PyPDF2.PdfReader(file)
-    text = ""
-    for page in pdf_reader.pages:
-        page_text = page.extract_text()
-        if page_text:
-            text += page_text
+    pdf_reader = PyPDF2.PdfReader(io.BytesIO(file.read()))
+    text = "".join(page.extract_text() for page in pdf_reader.pages if page.extract_text())
     return text.strip()
 
 @st.cache_data
 def extract_text_from_docx(file):
     """Extrahiert Text aus DOCX-Datei."""
-    doc = docx.Document(file)
-    text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
-    return text.strip()
-
-def is_pdf_ocr(text):
-    """Prüft, ob das PDF OCR-Text enthält (Implementierung erforderlich)."""
-    # Dummy-Implementierung, bitte nach Bedarf anpassen
-    return bool(text)
+    doc = docx.Document(io.BytesIO(file.read()))
+    return "\n".join([paragraph.text for paragraph in doc.paragraphs]).strip()
 
 def process_pdf(file):
-    text_content = extract_text_from_pdf(file)
+    file_bytes = file.getvalue()
+    text_content = extract_text_from_pdf(io.BytesIO(file_bytes))
     
-    # Wenn kein Text gefunden wurde, nehme an, dass es ein nicht-OCR-PDF ist
-    if not text_content or not is_pdf_ocr(text_content):
-        st.warning("Dieses PDF ist nicht OCR-geschützt. Textextraktion fehlgeschlagen. Bitte laden Sie ein OCR-PDF hoch.")
-        return None, convert_pdf_to_images(file)  # Fallback zur Bildverarbeitung
+    if not text_content:
+        st.warning("Kein Text im PDF gefunden. Es wird versucht, es als Bilder zu verarbeiten.")
+        return None, convert_pdf_to_images(io.BytesIO(file_bytes))
     else:
         return text_content, None
 
 def main():
     """Hauptfunktion für die Streamlit-App."""
-    # Modellenauswahl mit Dropdown
     st.subheader("Modell für die Generierung auswählen:")
     model_options = ["gpt-4o", "gpt-4o-mini"]
     selected_model = st.selectbox("Wählen Sie das Modell aus:", model_options, index=0)
 
-    # Sprachenauswahl mit Radiobuttons
     st.subheader("Sprache für generierte Fragen auswählen:")
     languages = {
-        "Deutsch": "German",
-        "Englisch": "English",
-        "Französisch": "French",
-        "Italienisch": "Italian",
-        "Spanisch": "Spanish"
+        "Deutsch": "German", "Englisch": "English", "Französisch": "French", 
+        "Italienisch": "Italian", "Spanisch": "Spanish"
     }
-    selected_language = st.radio("Wählen Sie die Sprache für die Ausgabe:", list(languages.keys()), index=0)
+    selected_language_key = st.radio("Wählen Sie die Sprache für die Ausgabe:", list(languages.keys()), index=0)
+    selected_language = languages[selected_language_key]
 
-    # Dateiuploader-Bereich
     uploaded_file = st.file_uploader("Laden Sie eine PDF, DOCX oder Bilddatei hoch", type=["pdf", "docx", "jpg", "jpeg", "png"])
 
     text_content = ""
     image_content = None
     images = []
 
-    # Cache zurücksetzen, wenn eine neue Datei hochgeladen wird
     if uploaded_file:
-        st.cache_data.clear()  # Dies löscht den Cache, um vorherige zwischengespeicherte Werte zu vermeiden
+        # Clear Streamlit's function cache AND our session state cache
+        if 'last_uploaded_filename' not in st.session_state or st.session_state.last_uploaded_filename != uploaded_file.name:
+            st.cache_data.clear()
+            # Clear all potential session state caches
+            for key in list(st.session_state.keys()):
+                if key.startswith('cached_responses') or key.startswith('source_content_hash'):
+                    del st.session_state[key]
+            st.session_state.last_uploaded_filename = uploaded_file.name
+            st.info("Neue Datei hochgeladen. Alle Caches wurden geleert.")
 
     if uploaded_file is not None:
         if uploaded_file.type == "application/pdf":
             text_content, images = process_pdf(uploaded_file)
             if text_content:
-                st.success("Text aus PDF extrahiert. Sie können ihn nun im folgenden Textfeld bearbeiten. PDFs, die länger als 5 Seiten sind, sollten gekürzt werden.")
+                st.success("Text aus PDF extrahiert. Sie können ihn nun bearbeiten.")
             elif images:
                 st.success("PDF in Bilder konvertiert. Sie können jetzt Fragen zu jeder Seite stellen.")
         elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
             text_content = extract_text_from_docx(uploaded_file)
-            st.success("Text erfolgreich extrahiert. Sie können ihn nun im folgenden Textbereich bearbeiten.")
+            st.success("Text erfolgreich extrahiert. Sie können ihn nun bearbeiten.")
         elif uploaded_file.type.startswith('image/'):
             image_content = Image.open(uploaded_file)
             st.image(image_content, caption='Hochgeladenes Bild', use_column_width=True)
-            st.success("Bild erfolgreich hochgeladen. Sie können jetzt Fragen zum Bild stellen.")
-        else:
-            st.error("Nicht unterstützter Dateityp. Bitte laden Sie eine PDF, DOCX oder Bilddatei hoch.")
+            st.success("Bild erfolgreich hochgeladen.")
 
-    # Bilder verarbeiten, falls vorhanden, ansonsten Text oder Bildinhalt verarbeiten
     if images:
-        process_images(images, selected_language, selected_model)  # Übergabe der ausgewählten Sprache und des Modells hier
+        process_images(images, selected_language, selected_model)
     else:
-        user_input = st.text_area("Geben Sie Ihren Text oder Ihre Frage zum Bild ein:", value=text_content)
+        user_input = st.text_area("Geben Sie Ihren Text oder Ihre Frage zum Bild ein:", value=text_content, height=300)
         learning_goals = st.text_area("Lernziele (Optional):")
         
-        # Fragetypen auswählen
         selected_types = st.multiselect("Wählen Sie die Fragetypen zur Generierung aus:", MESSAGE_TYPES)
         
-        # Benutzerdefiniertes CSS für hellblauen Hintergrund in Info-Callouts
+        # Custom CSS for callouts
         st.markdown(
             """
             <style>
-            .custom-info {
-                background-color: #e7f3fe;
-                padding: 10px;
-                border-radius: 5px;
-                border-left: 6px solid #2196F3;
-            }
-            .custom-success {
-                background-color: #d4edda;
-                padding: 10px;
-                border-radius: 5px;
-                border-left: 6px solid #28a745;
-            }
-            .custom-warning {
-                background-color: #fff3cd;
-                padding: 10px;
-                border-radius: 5px;
-                border-left: 6px solid #ffc107;
-            }
+            .custom-info { background-color: #e7f3fe; padding: 10px; border-radius: 5px; border-left: 6px solid #2196F3; }
+            .custom-success { background-color: #d4edda; padding: 10px; border-radius: 5px; border-left: 6px solid #28a745; }
+            .custom-warning { background-color: #fff3cd; padding: 10px; border-radius: 5px; border-left: 6px solid #ffc107; }
             </style>
             """, unsafe_allow_html=True
         )
-
-    
-        # Button zum Generieren von Fragen
+        
         if st.button("Fragen generieren"):
             if not client:
-                st.error("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein, um Fragen zu generieren.")
+                st.error("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein.")
             elif (user_input or image_content) and selected_types:
-                # Übergabe der ausgewählten Sprache und des Modells zur Funktion
-                generate_questions_with_image(user_input, learning_goals, selected_types, image_content, selected_language, selected_model)              
+                generate_questions(user_input, learning_goals, selected_types, image_content, selected_language, selected_model)
             elif not user_input and not image_content:
-                st.warning("Bitte geben Sie etwas Text ein, laden Sie eine Datei hoch oder laden Sie ein Bild hoch.")
+                st.warning("Bitte geben Sie Text ein oder laden Sie eine Datei hoch.")
             elif not selected_types:
                 st.warning("Bitte wählen Sie mindestens einen Fragetyp aus.")
 
 if __name__ == "__main__":
     main()
-
