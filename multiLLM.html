@@ -213,7 +213,7 @@
                 google: { url: 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}', keyId: 'google_api_key', modelId: 'google-model-select' },
                 openai: { url: 'https://api.openai.com/v1/chat/completions', keyId: 'openai_api_key', modelId: 'openai-model-select' },
                 anthropic: { url: 'https://api.anthropic.com/v1/messages', keyId: 'anthropic_api_key', modelId: 'anthropic-model-select' },
-                deepseek: { url: 'https://api.deepseek.com/models', keyId: 'deepseek_api_key', modelId: 'deepseek-model-select' }
+                deepseek: { url: 'https://api.deepseek.com/chat/completions', keyId: 'deepseek_api_key', modelId: 'deepseek-model-select' }
             };
 
             function initializeUI() {
@@ -270,7 +270,6 @@
                     const reader = new FileReader();
                     reader.onload = e => {
                         const base64Data = e.target.result.split(',')[1];
-                        // Store a generic format first
                         uploadedImages.push({
                             media_type: file.type,
                             data: base64Data
@@ -300,9 +299,13 @@
                 let headers = { 'Content-Type': 'application/json' };
                 let body;
                 
-                // Build the content payload based on the provider's requirements
-                let contentPayload = [{ type: 'text', text: prompt }];
+                // --- CORRECTED PAYLOAD LOGIC ---
+                let contentPayload;
 
+                // 1. Start with the text part
+                let promptParts = [{ type: 'text', text: prompt }];
+
+                // 2. Add image parts in the correct format for the provider
                 if (uploadedImages.length > 0) {
                      if (provider === 'google' || provider === 'anthropic' || provider === 'openai' || provider === 'deepseek') {
                         const imageParts = uploadedImages.map(img => {
@@ -318,41 +321,36 @@
                                     return null;
                             }
                         }).filter(p => p !== null);
-                        
-                        // For OpenAI/Deepseek, all parts are in one message. For others, they are separate parts of the payload.
-                        if (provider === 'openai' || provider === 'deepseek') {
-                            contentPayload.push(...imageParts);
-                        } else {
-                            contentPayload = contentPayload.concat(imageParts);
-                        }
+                        promptParts.push(...imageParts);
                      } else {
                          alert(`Bild-Uploads werden von ${provider} derzeit nicht unterstützt.`);
                      }
                 }
 
-                // Construct the final request body for each provider
+                // 3. Construct the final request body for each provider
                 switch (provider) {
                     case 'google':
-                        body = { contents: [{ parts: contentPayload }] };
+                        body = { contents: [{ parts: promptParts }] };
                         break;
                     case 'openai':
                     case 'deepseek':
                         headers.Authorization = `Bearer ${apiKey}`;
-                        body = { model: model, messages: [{ role: 'user', content: contentPayload }] };
+                        // For these providers, content is a mix of text and image_url objects
+                        body = { model: model, messages: [{ role: 'user', content: promptParts }] };
                         break;
                     case 'anthropic':
                         headers['x-api-key'] = apiKey;
                         headers['anthropic-version'] = '2023-06-01';
-                        body = { model: model, max_tokens: 4096, messages: [{ role: 'user', content: contentPayload }] };
+                        // For Anthropic, content is also an array of blocks
+                        body = { model: model, max_tokens: 4096, messages: [{ role: 'user', content: promptParts }] };
                         break;
                 }
                 
                 try {
                     const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
                     if (!response.ok) {
-                        const err = await response.json();
-                        const errorMsg = err.error?.message || JSON.stringify(err);
-                        throw new Error(`API Fehler: ${errorMsg}`);
+                        const errText = await response.text(); // Get raw text for better debugging
+                        throw new Error(`API Fehler (${response.status}): ${errText}`);
                     }
                     const data = await response.json();
 
