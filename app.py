@@ -374,7 +374,7 @@ def get_chatgpt_response(prompt, model, image=None, selected_language="English")
         response = client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=4096,  # Adjusted for modern models
+            max_tokens=15000,  # Adjusted for modern models
             temperature=0.6
         )
         
@@ -532,7 +532,7 @@ def process_pdf(file):
 def main():
     """Hauptfunktion für die Streamlit-App."""
     st.subheader("Modell für die Generierung auswählen:")
-    model_options = ["gpt-4o", "gpt-4o-mini"]
+    model_options = ["gpt-4o", "gpt-4.1"]
     selected_model = st.selectbox("Wählen Sie das Modell aus:", model_options, index=0)
 
     st.subheader("Sprache für generierte Fragen auswählen:")
