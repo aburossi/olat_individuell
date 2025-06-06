@@ -120,7 +120,10 @@
                         <div class="space-y-1 text-center">
                             <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
                             <div class="flex text-sm text-gray-600">
-                                <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none"><input id="file-upload" name="file-upload" type="file" class="sr-only" accept="image/png, image/jpeg" multiple></label>
+                                <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none">
+                                    <span>Dateien auswählen</span>
+                                    <input id="file-upload" name="file-upload" type="file" class="sr-only" accept="image/png, image/jpeg" multiple>
+                                </label>
                                 <p class="pl-1">oder hierher ziehen</p>
                             </div>
                             <p class="text-xs text-gray-500">PNG, JPG bis 10MB</p>
@@ -237,6 +240,7 @@
                 generateQuestionsBtn.addEventListener('click', handleGenerateQuestions);
                 exploreTopicsBtn.addEventListener('click', handleExploreTopics);
                 downloadBtn.addEventListener('click', handleDownload);
+                switchProviderConfig.call(providerSelect); // Initial call
             }
 
             function switchProviderConfig() {
@@ -265,7 +269,13 @@
                 files.forEach(file => {
                     const reader = new FileReader();
                     reader.onload = e => {
-                        uploadedImages.push({ type: 'image', source: { type: 'base64', media_type: file.type, data: e.target.result.split(',')[1] } });
+                        const base64Data = e.target.result.split(',')[1];
+                        // Store a generic format first
+                        uploadedImages.push({
+                            media_type: file.type,
+                            data: base64Data
+                        });
+
                         const img = document.createElement('img');
                         img.src = e.target.result;
                         img.className = 'h-20 w-20 object-cover rounded-md';
@@ -289,29 +299,51 @@
                 let url = config.url.replace('{model}', model).replace('{apiKey}', apiKey);
                 let headers = { 'Content-Type': 'application/json' };
                 let body;
+                
+                // Build the content payload based on the provider's requirements
+                let contentPayload = [{ type: 'text', text: prompt }];
 
-                let content = [{ type: 'text', text: prompt }];
                 if (uploadedImages.length > 0) {
-                     if (provider === 'google' || provider === 'anthropic' || provider === 'openai') {
-                         content.push(...uploadedImages);
+                     if (provider === 'google' || provider === 'anthropic' || provider === 'openai' || provider === 'deepseek') {
+                        const imageParts = uploadedImages.map(img => {
+                            switch(provider) {
+                                case 'google':
+                                    return { inlineData: { mimeType: img.media_type, data: img.data } };
+                                case 'anthropic':
+                                    return { type: 'image', source: { type: 'base64', media_type: img.media_type, data: img.data } };
+                                case 'openai':
+                                case 'deepseek':
+                                    return { type: 'image_url', image_url: { url: `data:${img.media_type};base64,${img.data}` } };
+                                default:
+                                    return null;
+                            }
+                        }).filter(p => p !== null);
+                        
+                        // For OpenAI/Deepseek, all parts are in one message. For others, they are separate parts of the payload.
+                        if (provider === 'openai' || provider === 'deepseek') {
+                            contentPayload.push(...imageParts);
+                        } else {
+                            contentPayload = contentPayload.concat(imageParts);
+                        }
                      } else {
                          alert(`Bild-Uploads werden von ${provider} derzeit nicht unterstützt.`);
                      }
                 }
-                
+
+                // Construct the final request body for each provider
                 switch (provider) {
                     case 'google':
-                        body = { contents: [{ parts: content }] };
+                        body = { contents: [{ parts: contentPayload }] };
                         break;
                     case 'openai':
                     case 'deepseek':
                         headers.Authorization = `Bearer ${apiKey}`;
-                        body = { model: model, messages: [{ role: 'user', content: prompt }] };
+                        body = { model: model, messages: [{ role: 'user', content: contentPayload }] };
                         break;
                     case 'anthropic':
                         headers['x-api-key'] = apiKey;
                         headers['anthropic-version'] = '2023-06-01';
-                        body = { model: model, max_tokens: 4096, messages: [{ role: 'user', content: content }] };
+                        body = { model: model, max_tokens: 4096, messages: [{ role: 'user', content: contentPayload }] };
                         break;
                 }
                 
@@ -319,7 +351,8 @@
                     const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
                     if (!response.ok) {
                         const err = await response.json();
-                        throw new Error(`API Fehler: ${err.error.message}`);
+                        const errorMsg = err.error?.message || JSON.stringify(err);
+                        throw new Error(`API Fehler: ${errorMsg}`);
                     }
                     const data = await response.json();
 
@@ -332,6 +365,7 @@
                         default: return null;
                     }
                 } catch (e) {
+                    console.error("API Call failed:", e);
                     alert(`Fehler: ${e.message}`);
                     return null;
                 }
@@ -362,6 +396,7 @@
 
                 showSpinner(true);
                 allResponsesContainer.textContent = '';
+                topicExplorerResultsContainer.innerHTML = '';
                 let allGeneratedResponses = '';
 
                 for (const type of selectedTypes) {
