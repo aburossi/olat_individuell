@@ -163,6 +163,7 @@
             const downloadBtn = document.getElementById('download-btn');
 
             let uploadedImages = []; // To store base64 images
+            const promptCache = {}; // Cache for fetched prompt files
 
             // --- Constants & Config ---
             const QUESTION_TYPES = [
@@ -209,6 +210,29 @@
 
 
             // --- Functions ---
+            
+            // NEW: Function to fetch prompts from .md files
+            async function fetchPromptForType(type) {
+                if (promptCache[type]) {
+                    return promptCache[type];
+                }
+                const path = `prompts/${type}.md`;
+                try {
+                    const response = await fetch(path);
+                    if (!response.ok) {
+                        throw new Error(`Konnte die Prompt-Datei nicht laden: ${response.statusText}`);
+                    }
+                    const promptText = await response.text();
+                    promptCache[type] = promptText; // Cache the result
+                    return promptText;
+                } catch (error) {
+                    console.error(`Fehler beim Abrufen der Prompt-Datei für ${type}:`, error);
+                    alert(`Konnte die Anweisungen für den Fragetyp "${type}" nicht laden. Stellen Sie sicher, dass die Datei ${path} existiert.`);
+                    return null;
+                }
+            }
+
+
             function handleImageUpload(event) {
                 uploadedImages = [];
                 imagePreviews.innerHTML = '';
@@ -343,8 +367,11 @@
                 let allGeneratedResponses = '';
 
                 for (const type of selectedTypes) {
-                    const prompt = getPromptForType(type, text, learningGoals);
-                    let promptParts = [{ text: prompt }];
+                    const basePrompt = await fetchPromptForType(type);
+                    if (!basePrompt) continue; // Skip if prompt failed to load
+
+                    const fullPrompt = assembleFullPrompt(basePrompt, text, learningGoals);
+                    let promptParts = [{ text: fullPrompt }];
                     
                     if (uploadedImages.length > 0) {
                       promptParts.push(...uploadedImages);
@@ -369,6 +396,13 @@
                 downloadBtn.style.display = allGeneratedResponses ? 'block' : 'none';
                 showSpinner(false);
             }
+
+            function assembleFullPrompt(basePrompt, text, learningGoals) {
+                const language = languageSelect.value;
+                const zielniveau = ZIELNIVEAU_PROMPTS[zielniveauSelect.value];
+                
+                return `${basePrompt}\n\n## CONTEXT ##\nLanguage: ${language}\nZielniveau: ${zielniveau}\nLearning Goals: """${learningGoals}"""\n\n## MATERIAL ##\n"""${text}"""`;
+            }
             
             function handleDownload() {
                 const textToSave = allResponsesContainer.textContent;
@@ -381,30 +415,6 @@
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
-            }
-
-            function getPromptForType(type, text, learningGoals) {
-                const language = languageSelect.value;
-                const zielniveau = ZIELNIVEAU_PROMPTS[zielniveauSelect.value];
-                const basePrompt = `Du bist ein Experte im Erstellen von Testfragen. Generiere Fragen in ${language} für das folgende Zielniveau:\n${zielniveau}\n\nBasierend auf diesem Inhalt:\n"""${text}"""\n\nUnd diesen Lernzielen:\n"""${learningGoals}"""\n\nAntworte AUSSCHLIESSLICH mit einem validen JSON-Objekt oder -Array.`;
-                
-                switch(type) {
-                    case 'single_choice':
-                    case 'multiple_choice1':
-                    case 'multiple_choice2':
-                    case 'multiple_choice3':
-                        const correctAnswers = parseInt(type.replace('multiple_choice', '')) || 1;
-                        return `${basePrompt}\nGeneriere 2 Fragen. Jede Frage sollte 4 Antwortmöglichkeiten haben, von denen genau ${correctAnswers} richtig ist/sind. Das JSON-Array soll Objekte mit der Struktur enthalten: { "title": "Fragentitel", "question": "Frage", "points": ${correctAnswers}, "answers": [{ "text": "Antwort", "correct": boolean, "points": number (1 für richtig, 0 für falsch) }] }`;
-                    case 'truefalse':
-                        return `${basePrompt}\nGeneriere 3 "Richtig/Falsch"-Aussagen. Das JSON-Array soll Objekte mit der Struktur enthalten: { "title": "Richtig oder Falsch?", "question": "Die Aussage", "is_true": boolean, "points": 1 }`;
-                    case 'kprim':
-                        return `${basePrompt}\nGeneriere 2 KPRIM-Fragen. Jede Frage hat 4 Aussagen, die jeweils richtig oder falsch sein können. Das JSON-Array soll Objekte mit der Struktur enthalten: { "title": "KPRIM-Frage", "question": "Hauptfrage oder Thema", "points": 4, "statements": [{ "text": "Aussage", "correct": boolean }] }`;
-                    case 'inline_fib':
-                        return `${basePrompt}\nGeneriere EINEN Lückentext mit 3-5 Lücken. Erstelle auch 3-5 falsche Antwortmöglichkeiten. Das JSON-Objekt soll die Struktur haben: { "title": "Lückentext", "text_with_placeholders": "Text mit __BLANK__ als Platzhalter", "correct_words": ["Wort1", "Wort2"], "distractors": ["Falsch1", "Falsch2"] }`;
-                    case 'draganddrop':
-                         return `${basePrompt}\nGeneriere eine Drag-and-Drop-Aufgabe mit 4-6 Begriffen, die 2-3 Kategorien zugeordnet werden müssen. Das JSON-Objekt soll die Struktur haben: { "title": "Begriffe zuordnen", "question": "Aufgabenstellung", "points": number, "categories": ["Kat1", "Kat2"], "items": [{ "text": "Begriff", "category": "Kat1" }] }`;
-                    default: return basePrompt;
-                }
             }
 
             function convertJsonToOlat(type, data) {
