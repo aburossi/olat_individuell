@@ -92,11 +92,11 @@ Cantonal Decision-Making: Has autonomy over education, Influenced by local econo
 - No additional explanation. ONLY the questions as plain text. never use ':' as a separator.
 
 //rules
-- rules Drag&drop may have 2-4 drop categories and 2 to 1-0.5 drag categories
+- rules Drag&drop may have 2-4 drop categories and 2 to 5 drag categories
 - ALWAYS check that the Points correspond to the Sum_of_correct_answers
 
 //templates_closed.txt
-Typ\tDrag&Drop\nLevel\t{bloom_level}\nTitle\tgeneral_title_of_the_question\nQuestion\tgeneral_question_text_placeholder\nPoints\tSum_of_correct_answers\n\tPrompt_1\tPrompt_2\tPrompt_3\nCorresponding_Statement_1\t-0.5\t1\t-0.5\nCorresponding_Statement_2\t-0.5\t-0.5\t1\nCorresponding_Statement_3\t1\t-0.5\t-0.5
+Typ\tDrag&Drop\nLevel\t{bloom_level}\nTitle\tgeneral_title_of_the_question\nQuestion\tgeneral_question_text_placeholder\nPoints\tSum_of_correct_answers\n\tdrop_1\tdrop_2\tdrop_3\ndrag_1\t-0.5\t1\t-0.5\ndrag_2\t-0.5\t-0.5\t1\ndrag_3\t1\t-0.5\t-0.5
 
 OUTPUT Example in german:
 'Typ	Drag&drop
