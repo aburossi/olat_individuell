@@ -211,7 +211,6 @@
 
             // --- Functions ---
             
-            // NEW: Function to fetch prompts from .md files
             async function fetchPromptForType(type) {
                 if (promptCache[type]) {
                     return promptCache[type];
@@ -302,6 +301,33 @@
                     return null;
                 }
             }
+
+            // NEW: Function to clean and parse JSON from Gemini response
+            function cleanAndParseJson(text) {
+                // First, remove markdown fences like ```json and ```
+                const cleanedText = text.trim().replace(/^```json\s*/, '').replace(/```\s*$/, '');
+                
+                // Find the first occurrence of '{' or '[' to determine the start of the JSON
+                const firstBracketIndex = cleanedText.indexOf('{');
+                const firstSquareIndex = cleanedText.indexOf('[');
+
+                let startIndex = -1;
+                if (firstBracketIndex === -1) {
+                    startIndex = firstSquareIndex;
+                } else if (firstSquareIndex === -1) {
+                    startIndex = firstBracketIndex;
+                } else {
+                    startIndex = Math.min(firstBracketIndex, firstSquareIndex);
+                }
+
+                if (startIndex === -1) {
+                    throw new Error("Kein JSON-Objekt oder -Array in der bereinigten Antwort gefunden.");
+                }
+
+                // Assume the valid JSON starts from the first bracket found
+                const jsonString = cleanedText.substring(startIndex);
+                return JSON.parse(jsonString);
+            }
             
             async function handleGenerateGoals() {
                 const text = userInput.value.trim();
@@ -381,13 +407,15 @@
 
                     if (result) {
                         try {
-                            const jsonData = JSON.parse(result);
+                            // UPDATED: Use the new robust JSON parsing function
+                            const jsonData = cleanAndParseJson(result);
                             const olatText = convertJsonToOlat(type, jsonData);
                             allGeneratedResponses += olatText + '\n\n---\n\n';
                         } catch(e) {
                             console.error(`Fehler beim Verarbeiten der Antwort für ${type}:`, e);
                             console.error("Fehlerhafte JSON-Antwort:", result);
-                            allGeneratedResponses += `## FEHLER BEI DER VERARBEITUNG FÜR ${type.toUpperCase()} ##\n${result}\n\n---\n\n`;
+                            // Provide a more user-friendly error in the output
+                            allGeneratedResponses += `## FEHLER FÜR ${type.toUpperCase()} ##\nDie KI hat ein ungültiges Format zurückgegeben, das nicht verarbeitet werden konnte.\n\nOriginalantwort:\n${result}\n\n---\n\n`;
                         }
                     }
                 }
