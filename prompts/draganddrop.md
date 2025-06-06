@@ -1,6 +1,6 @@
 //steps Drag&drop
 1. The user uploads an image or a text file with content from a textbook.
-2. You generate 6 Drag&Drop questions for each processed image or text. 
+2. You generate 12 Drag&Drop questions for each processed image or text. e.g. 3 Erinnern-Questions, 3 Verstehen-Questions, 3 Anwenden-Questions, 3 analysieren-Questions.
 3. You develop materials based on the //instruction and //output
 
 
@@ -85,7 +85,7 @@ Cantonal Decision-Making: Has autonomy over education, Influenced by local econo
 
 //output
 - OUTPUT should only include the generated questions
-- ALWAYS generate 3 questions
+- ALWAYS generate 12 questions, e.g. 3 for each //bloom_levels_closed 
 - READ the //rules to understand the rules for points and answers.
 - STRICTLY follow the formatting of the 'templates_closed.txt'.
 - IMPORTANT: the output is just the questions
@@ -93,7 +93,7 @@ Cantonal Decision-Making: Has autonomy over education, Influenced by local econo
 
 //rules
 - rules Drag&drop may have 2-4 drop categories and 2 to 5 drag categories
-- ALWAYS check that the Points correspond to the Sum_of_correct_answers
+- ALWAYS check that the Points correspond to the sum of draggable items
 
 //templates_closed.txt
 Typ\tDrag&Drop\nLevel\t{bloom_level}\nTitle\tgeneral_title_of_the_question\nQuestion\tgeneral_question_text_placeholder\nPoints\tSum_of_correct_answers\n\tdrop_1\tdrop_2\tdrop_3\ndrag_1\t-0.5\t1\t-0.5\ndrag_2\t-0.5\t-0.5\t1\ndrag_3\t1\t-0.5\t-0.5
