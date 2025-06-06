@@ -255,7 +255,7 @@
                 });
             }
 
-            async function callGeminiAPI(promptParts, isJson = true) {
+            async function callGeminiAPI(promptParts) {
                 const apiKey = apiKeyInput.value;
                 if (!apiKey) {
                     alert("Bitte geben Sie Ihren Gemini API Schlüssel ein.");
@@ -267,7 +267,6 @@
                   contents: [{ role: "user", parts: promptParts }],
                   generationConfig: { temperature: 0.6, maxOutputTokens: 8192 }
                 };
-                if (isJson) payload.generationConfig.responseMimeType = "application/json";
 
                 try {
                     const response = await fetch(url, {
@@ -280,28 +279,19 @@
                         throw new Error(`API Fehler: ${response.status} ${response.statusText} - ${errorBody.error.message}`);
                     }
                     const data = await response.json();
-                    return data.candidates[0].content.parts[0].text;
+                    // Ensure there's a candidate and content before accessing parts
+                    if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts.length > 0) {
+                         return data.candidates[0].content.parts[0].text;
+                    } else {
+                        // Handle cases where response might be blocked or empty
+                        console.warn("Gemini-Antwort war leer oder blockiert.", data);
+                        return `// Keine gültige Antwort vom Modell erhalten. Bitte überprüfen Sie die Ausgabe in der Entwicklerkonsole.`;
+                    }
                 } catch (error) {
                     console.error("Fehler bei der Gemini API-Anfrage:", error);
                     alert(`Ein Fehler ist aufgetreten: ${error.message}`);
                     return null;
                 }
-            }
-
-            function cleanAndParseJson(text) {
-                const cleanedText = text.trim().replace(/^```json\s*/, '').replace(/```\s*$/, '');
-                const firstBracketIndex = cleanedText.indexOf('{');
-                const firstSquareIndex = cleanedText.indexOf('[');
-
-                let startIndex = -1;
-                if (firstBracketIndex === -1) startIndex = firstSquareIndex;
-                else if (firstSquareIndex === -1) startIndex = firstBracketIndex;
-                else startIndex = Math.min(firstBracketIndex, firstSquareIndex);
-
-                if (startIndex === -1) throw new Error("Kein JSON-Objekt oder -Array in der Antwort gefunden.");
-                
-                const jsonString = cleanedText.substring(startIndex);
-                return JSON.parse(jsonString);
             }
             
             async function handleGenerateGoals() {
@@ -314,7 +304,7 @@
                 const prompt = `Analysiere den folgenden Inhalt und generiere 3-5 prägnante, aussagekräftige Lernziele für Lernende auf dem Niveau "${zielniveauSelect.value}". Formuliere die Ziele als "Die Lernenden können...". Gib nur die Liste der Lernziele aus.`;
                 let promptParts = [{ text: prompt }, {text: `\n\n--- INHALT ---\n${text}`}];
                 promptParts.push(...uploadedImages);
-                const result = await callGeminiAPI(promptParts, false);
+                const result = await callGeminiAPI(promptParts);
                 if (result) learningGoalsInput.value = result;
                 showSpinner(false);
             }
@@ -330,7 +320,7 @@
                 const prompt = `Analysiere den folgenden Inhalt. Schlage 3 bis 5 verwandte Themen vor. Formatiere deine Antwort als HTML mit <h4> Überschriften und <p> Paragraphen.`;
                 let promptParts = [{ text: prompt }, {text: `\n\n--- INHALT ---\n${text}`}];
                 promptParts.push(...uploadedImages);
-                const result = await callGeminiAPI(promptParts, false);
+                const result = await callGeminiAPI(promptParts);
                 if(result) {
                     topicExplorerResultsContainer.innerHTML = `<h3 class="text-lg font-semibold mb-2 text-indigo-700">✨ Themen-Explorer Ergebnisse</h3><div class="p-4 bg-indigo-50 rounded-md border border-indigo-200">${result}</div>`;
                 }
@@ -360,17 +350,14 @@
                     let promptParts = [{ text: fullPrompt }];
                     if (uploadedImages.length > 0) promptParts.push(...uploadedImages);
                     
-                    const result = await callGeminiAPI(promptParts, true);
+                    // Call API expecting plain text
+                    const result = await callGeminiAPI(promptParts);
 
                     if (result) {
-                        try {
-                            const jsonData = cleanAndParseJson(result);
-                            const olatText = convertJsonToOlat(type, jsonData);
-                            allGeneratedResponses += olatText + '\n\n---\n\n';
-                        } catch(e) {
-                            console.error(`Fehler beim Verarbeiten von ${type}:`, e);
-                            allGeneratedResponses += `## FEHLER FÜR ${type.toUpperCase()} ##\nDie KI hat ein ungültiges Format zurückgegeben.\n\nOriginalantwort:\n${result}\n\n---\n\n`;
-                        }
+                        // The result is directly appended. No more JSON parsing.
+                        allGeneratedResponses += result + '\n\n---\n\n';
+                    } else {
+                        allGeneratedResponses += `## FEHLER FÜR ${type.toUpperCase()} ##\nDie KI hat keine Antwort für diesen Fragetyp generiert.\n\n---\n\n`;
                     }
                 }
                 
@@ -397,83 +384,7 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             }
-
-            // --- UPDATED: Robust JSON to OLAT Conversion ---
-            function convertJsonToOlat(type, data) {
-                const replaceSharpS = (text) => text ? text.toString().replace(/ß/g, 'ss') : '';
-                
-                if (type.includes('choice')) {
-                    if (!Array.isArray(data)) data = [data]; // Handle single object response
-                    return data.map(q => {
-                        let answersText = '';
-                        let totalPoints = 0;
-
-                        if (q.answers && Array.isArray(q.answers)) {
-                            // Handles structure: { answers: [{ text: "...", points: 1, correct: true }] }
-                            answersText = q.answers.map(a => `Answer\t${replaceSharpS(a.text)}\t${a.points}`).join('\n');
-                            totalPoints = q.answers.filter(a => a.correct).reduce((sum, a) => sum + a.points, 0);
-                        } else {
-                            // Handles structure: { "1": "correct answer", "-0.5": "wrong answer" }
-                            const answerLines = [];
-                            for (const key in q) {
-                                if (!isNaN(parseFloat(key)) && isFinite(key)) {
-                                    const points = parseFloat(key);
-                                    if (points > 0) totalPoints += points;
-                                    answerLines.push(`Answer\t${replaceSharpS(q[key])}\t${points}`);
-                                }
-                            }
-                            answersText = answerLines.join('\n');
-                        }
-                        
-                        if (!answersText) return `## FEHLER: Keine Antworten für Frage gefunden: ${JSON.stringify(q)} ##`;
-
-                        const title = q.Title || q.title || "Frage";
-                        const question = q.Question || q.question;
-                        const finalPoints = (typeof q.Points === 'number') ? q.Points : (q.points || totalPoints || 1);
-
-                        return `Type\t${type.startsWith('single') ? 'Singlechoice' : 'Multiplechoice'}\nTitle\t${replaceSharpS(title)}\nQuestion\t${replaceSharpS(question)}\nPoints\t${finalPoints}\n${answersText}`;
-                    }).join('\n\n');
-                }
-
-                switch(type) {
-                    case 'truefalse':
-                        if (!Array.isArray(data)) data = [data];
-                        return data.map(q => {
-                            const title = q.Title || q.title || "Richtig oder Falsch?";
-                            const question = q.Question || q.question;
-                            const points = q.Points || q.points || 1;
-                            const isTrue = q.is_true !== undefined ? q.is_true : q.isTrue;
-                            return `Type\tSinglechoice\nTitle\t${replaceSharpS(title)}\nQuestion\t${replaceSharpS(question)}\nPoints\t${points}\nAnswer\tRichtig\t${isTrue ? 1 : 0}\nAnswer\tFalsch\t${isTrue ? 0 : 1}`;
-                        }).join('\n\n');
-                    case 'kprim':
-                        if (!Array.isArray(data)) data = [data];
-                        return data.map(q => {
-                            const statements = (q.statements || []).map(s => `Answer\t${replaceSharpS(s.text)}\t${s.correct ? 1 : -1}`).join('\n');
-                            return `Type\tKprim\nTitle\t${replaceSharpS(q.title)}\nQuestion\t${replaceSharpS(q.question)}\nPoints\t${q.points || 4}\n${statements}`;
-                        }).join('\n\n');
-                    case 'inline_fib':
-                         let fibOutput = `Type\tFIB\nTitle\t${replaceSharpS(data.title)}\nPoints\t${data.correct_words.length}`;
-                        let icOutput = `Type\tInlinechoice\nTitle\t${replaceSharpS(data.title)} - Inline\nQuestion\tWählen Sie die richtigen Wörter aus.\nPoints\t${data.correct_words.length}`;
-                        const textParts = (data.text_with_placeholders || '').split('__BLANK__');
-                        const allOptions = [...(data.correct_words || []), ...(data.distractors || [])].sort(() => Math.random() - 0.5);
-
-                        textParts.forEach((part, i) => {
-                            fibOutput += `\nText\t${replaceSharpS(part.trim())}`;
-                            icOutput += `\nText\t${replaceSharpS(part.trim())}`;
-                            if (i < data.correct_words.length) {
-                                fibOutput += `\n1\t${replaceSharpS(data.correct_words[i])}\t20`;
-                                icOutput += `\n1\t${allOptions.map(replaceSharpS).join('|')}\t${replaceSharpS(data.correct_words[i])}\t|`;
-                            }
-                        });
-                        return `${icOutput}\n\n---\n\n${fibOutput}`;
-                    case 'draganddrop':
-                        const itemsText = (data.items || []).map(item => `Item\t${replaceSharpS(item.text)}\t${replaceSharpS(item.category)}`).join('\n');
-                        const dropsText = (data.categories || []).map(cat => `Drop\t${replaceSharpS(cat)}`).join('\n');
-                        return `Type\tDrag&Drop\nTitle\t${replaceSharpS(data.title)}\nQuestion\t${replaceSharpS(data.question)}\nPoints\t${data.points || data.items.length}\n${dropsText}\n${itemsText}`;
-                    default: return `// Typ ${type} wird noch nicht unterstützt`;
-                }
-            }
-
+            
             function showSpinner(show, text = '') {
                 spinner.style.display = show ? 'block' : 'none';
                 resultsContainer.style.display = show ? 'none' : 'block';
