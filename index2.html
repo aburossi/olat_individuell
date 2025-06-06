@@ -66,9 +66,15 @@
             <p class="mt-4 text-lg text-gray-600 max-w-3xl mx-auto">
                 Ein Werkzeug zur automatisierten Erstellung von Testfragen für Ihr Learning Management System (LMS).
             </p>
-            <a href="https://olat-import.streamlit.app/" target="_blank" rel="noopener noreferrer" class="mt-6 inline-block bg-sky-600 text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-sky-700 transition-colors shadow-lg">
-                Zur Live-App
-            </a>
+            <!-- Updated Buttons for OpenAI and Gemini Apps -->
+            <div class="mt-8 flex justify-center items-center flex-wrap gap-4">
+                <a href="https://olat-import.streamlit.app/" target="_blank" rel="noopener noreferrer" class="inline-block bg-sky-600 text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-sky-700 transition-colors shadow-lg">
+                    Zur OpenAI App
+                </a>
+                <a href="https://aburossi.github.io/olat_individuell/gemini" target="_blank" rel="noopener noreferrer" class="inline-block bg-green-600 text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-green-700 transition-colors shadow-lg">
+                    Zur Gemini App
+                </a>
+            </div>
         </header>
 
         <!-- Main Workflow Section -->
@@ -91,16 +97,16 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                     </div>
                     <h3 class="text-xl font-semibold mt-4 mb-2">2. Konfiguration</h3>
-                    <p class="text-gray-600 text-sm">Die Web-App (<span class="font-mono text-xs bg-gray-200 rounded px-1">app.py</span>) sammelt Ihre Eingaben und Einstellungen: Fragetyp, Sprache, kognitives Niveau und KI-Modell.</p>
+                    <p class="text-gray-600 text-sm">Die Web-App sammelt Ihre Eingaben und Einstellungen: Fragetyp, Sprache, kognitives Niveau und das gewünschte KI-Modell.</p>
                 </div>
                 
-                <!-- Step 3: AI Processing -->
+                <!-- Step 3: AI Processing (Updated) -->
                 <div class="flow-card interactive-card text-center lg:flow-arrow bg-white p-4 rounded-xl h-full">
                     <div class="flex justify-center items-center h-20 w-20 bg-purple-100 rounded-full mx-auto border-4 border-white shadow-md">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                     </div>
                     <h3 class="text-xl font-semibold mt-4 mb-2">3. KI-Generierung</h3>
-                    <p class="text-gray-600 text-sm">Wählen Sie das passende KI-Modell: <b>GPT-4o</b> für vielseitige Aufgaben, <b>GPT-4.1</b> für technische Inhalte oder <b>o4-mini</b> für komplexe, mehrstufige Anfragen.</p>
+                    <p class="text-gray-600 text-sm">Wählen Sie die passende KI: Die <b>OpenAI-App</b> bietet Modelle wie GPT-4o. Die <b>Gemini-App</b> nutzt Google's Modelle (z.B. Flash/Pro) und erfordert einen eigenen API-Schlüssel.</p>
                 </div>
 
                 <!-- Step 4: Formatting -->
@@ -133,14 +139,14 @@
                     <div class="feature-item interactive-card p-6 bg-gray-50 rounded-lg">
                         <h4 class="text-lg font-semibold mb-2 text-sky-700">Vielfältige Fragetypen</h4>
                         <ul class="space-y-1 text-sky-800 text-left">
-                           <li><a href="prompts/single_choice.md" class="hover:underline">Single Choice (Prompt)</a></li>
-                           <li><a href="prompts/multiple_choice1.md" class="hover:underline">Multiple Choice 1/4 (Prompt)</a></li>
-                           <li><a href="prompts/multiple_choice2.md" class="hover:underline">Multiple Choice 2/4 (Prompt)</a></li>
-                           <li><a href="prompts/multiple_choice3.md" class="hover:underline">Multiple Choice 3/4 (Prompt)</a></li>
-                           <li><a href="prompts/kprim.md" class="hover:underline">KPRIM (Prompt)</a></li>
-                           <li><a href="prompts/truefalse.md" class="hover:underline">Richtig/Falsch (Prompt)</a></li>
-                           <li><a href="prompts/inline_fib.md" class="hover:underline">Lückentext (Prompt)</a></li>
-                           <li><a href="prompts/draganddrop.md" class="hover:underline">Drag & Drop (Prompt)</a></li>
+                            <li><a href="prompts/single_choice.md" class="hover:underline">Single Choice (Prompt)</a></li>
+                            <li><a href="prompts/multiple_choice1.md" class="hover:underline">Multiple Choice 1/4 (Prompt)</a></li>
+                            <li><a href="prompts/multiple_choice2.md" class="hover:underline">Multiple Choice 2/4 (Prompt)</a></li>
+                            <li><a href="prompts/multiple_choice3.md" class="hover:underline">Multiple Choice 3/4 (Prompt)</a></li>
+                            <li><a href="prompts/kprim.md" class="hover:underline">KPRIM (Prompt)</a></li>
+                            <li><a href="prompts/truefalse.md" class="hover:underline">Richtig/Falsch (Prompt)</a></li>
+                            <li><a href="prompts/inline_fib.md" class="hover:underline">Lückentext (Prompt)</a></li>
+                            <li><a href="prompts/draganddrop.md" class="hover:underline">Drag & Drop (Prompt)</a></li>
                         </ul>
                     </div>
                     <div class="feature-item interactive-card p-6 bg-gray-50 rounded-lg">
@@ -155,9 +161,10 @@
                         <h4 class="text-lg font-semibold mb-2 text-green-700">Effizientes Caching</h4>
                         <p>Intelligentes Caching auf App- und API-Ebene reduziert Kosten, indem bereits generierte Fragen für identische Inhalte wiederverwendet werden.</p>
                     </div>
+                     <!-- Updated Feature Card -->
                     <div class="feature-item interactive-card p-6 bg-gray-50 rounded-lg">
                         <h4 class="text-lg font-semibold mb-2 text-yellow-700">Flexible Modell-Auswahl</h4>
-                        <p>Unterstützt verschiedene OpenAI-Modelle wie GPT-4o, sodass Sie das passende Werkzeug für Ihre Anforderungen wählen können.</p>
+                        <p>Unterstützt verschiedene KI-Modelle von OpenAI (z.B. GPT-4o) und Google (z.B. Gemini Pro & Flash), sodass Sie das passende Werkzeug wählen können.</p>
                     </div>
                     <div class="feature-item interactive-card p-6 bg-gray-50 rounded-lg">
                         <h4 class="text-lg font-semibold mb-2 text-red-700">Mehrsprachigkeit</h4>
@@ -174,14 +181,14 @@
                 <h3 class="text-2xl font-bold mb-4 text-gray-900">Integration in Ihr LMS</h3>
                 <p class="mb-6 text-gray-600">Der Import der generierten Fragen in OLAT ist unkompliziert:</p>
                 <ol class="list-decimal list-inside space-y-3 text-gray-700">
-                    <li><strong>Fragen generieren:</strong> Nutzen Sie die App, um die <span class="font-mono text-sm bg-gray-200 rounded px-1">.txt</span>-Datei zu erstellen und herunterzuladen.</li>
+                    <li><strong>Fragen generieren:</strong> Nutzen Sie eine der Apps, um die <span class="font-mono text-sm bg-gray-200 rounded px-1">.txt</span>-Datei zu erstellen und herunterzuladen.</li>
                     <li><strong>LMS öffnen:</strong> Loggen Sie sich in Ihr OLAT ein und navigieren Sie zum Test-Editor oder Fragenpool.</li>
                     <li><strong>Import starten:</strong> Wählen Sie "Fragen importieren". Die Texte können hier eingefügt und importiert werden (nicht "Test importieren").</li>
                     <li><strong>Überprüfen & Speichern:</strong> Kontrollieren Sie die importierten Fragen, passen Sie bei Bedarf Punkte an und speichern Sie den Vorgang ab.</li>
                 </ol>
             </div>
 
-            <!-- Technology Stack -->
+            <!-- Technology Stack (Updated) -->
             <div class="bg-white p-8 rounded-xl shadow-sm">
                 <h3 class="text-2xl font-bold mb-4 text-gray-900">Technischer Hintergrund</h3>
                 <p class="mb-6 text-gray-600">Dieses Projekt basiert auf einer Kombination moderner Python-Bibliotheken und APIs:</p>
@@ -189,6 +196,7 @@
                     <span class="bg-gray-200 text-gray-800 text-sm font-medium px-3 py-1 rounded-full">Python</span>
                     <span class="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">Streamlit</span>
                     <span class="bg-green-100 text-green-800 text-sm font-medium px-3 py-1 rounded-full">OpenAI API</span>
+                    <span class="bg-indigo-100 text-indigo-800 text-sm font-medium px-3 py-1 rounded-full">Gemini API</span>
                     <span class="bg-red-100 text-red-800 text-sm font-medium px-3 py-1 rounded-full">PyPDF2</span>
                     <span class="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">python-docx</span>
                     <span class="bg-yellow-100 text-yellow-800 text-sm font-medium px-3 py-1 rounded-full">Pillow</span>
