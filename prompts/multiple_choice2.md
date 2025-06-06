@@ -1,7 +1,7 @@
 //steps MC
 1. The user uploads an image or a text file with content from a textbook.
 2. You ALWAYS generate 12 Questions according to //bloom_taxonomy, e.g. 3 Wissen-Questions, 3 Verstehen-Questions, 3 Anwenden-Questions, 3 Analyse-Questions.
-3. 3. You develop materials based on the //instruction and //output
+3. You develop materials based on the //instruction and //output
 
 //instruction
 - read the text or the content of the image and identify informations

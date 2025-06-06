@@ -360,7 +360,7 @@ def get_chatgpt_response(prompt, model, images=None, selected_language="English"
     )
 
     try:
-        # ---- NEW: Logic for o4-mini Reasoning Model ----
+# ---- NEW: Logic for o4-mini Reasoning Model ----
         if model == "o4-mini":
             st.info(f"🧠 Rufe OpenAI Reasoning API (o4-mini) mit '{reasoning_effort}' Aufwand auf...")
             
@@ -402,21 +402,26 @@ def get_chatgpt_response(prompt, model, images=None, selected_language="English"
                 store=False
             )
 
-            # Antwort extrahieren, basierend auf der Snippet-Struktur
+            # ---- START OF CORRECTION ----
+            # Extrahiere die Antwort basierend auf der tatsächlichen Objektstruktur aus dem Fehlerprotokoll.
             assistant_message = None
-            if hasattr(response_obj, 'input') and isinstance(response_obj.input, list):
-                for item in response_obj.input:
+            # Das korrekte Attribut ist 'output', nicht 'input'.
+            if hasattr(response_obj, 'output') and isinstance(response_obj.output, list):
+                # Finde die Nachricht mit der Rolle 'assistant' in der output-Liste.
+                for item in response_obj.output:
                     if hasattr(item, 'role') and item.role == "assistant":
                         assistant_message = item
                         break
             
+            # Extrahiere den Text aus dem gefundenen Nachrichtenobjekt.
             if assistant_message and hasattr(assistant_message, 'content') and assistant_message.content:
+                # Der Inhalt ist eine Liste; wir nehmen den Text des ersten Elements.
                 return assistant_message.content[0].text
             else:
                 st.error("Konnte keine gültige Antwort vom o4-mini Modell finden.")
                 logging.error(f"Unerwartete o4-mini Antwortstruktur: {response_obj}")
                 return None
-
+            # ---- END OF CORRECTION ----
         # ---- EXISTING: Logic for Chat Completion Models (gpt-4o, etc.) ----
         else:
             user_content = [{"type": "text", "text": f"Generate questions in {selected_language}. {prompt}"}]
