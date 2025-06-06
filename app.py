@@ -184,6 +184,16 @@ MESSAGE_TYPES = [
     "inline_fib"
 ]
 
+# NEW: Definition der Zielniveaus
+ZIELNIVEAUS_MAP = {
+    "A2 (elementar / Primarstufe, frühe Sek I)": "🟢 A2 (elementar / Primarstufe, frühe Sek I)\nVerwende einfache Satzstrukturen und grundlegenden Wortschatz. Die Fragen sollen sich auf vertraute Alltagssituationen beziehen. Verwende visuelle Hilfen, wenn möglich. Halte die Fragen kurz und klar. Vermeide abstrakte Begriffe.",
+    "B1 (untere Sek II, Berufsschule, Realschule)": "🔵 B1 (untere Sek II, Berufsschule, Realschule)\nVerwende alltagsnahes, aber anspruchsvolleres Vokabular. Die Fragen sollen einfache Schlussfolgerungen und erste Transferleistungen ermöglichen. Verwende konkrete Kontexte (z. B. Schule, Arbeit, Freizeit). Halte sprachliche Komplexität moderat.",
+    "B2 (obere Sek II, Maturität, Bachelorbeginn)": "🟡 B2 (obere Sek II, Maturität, Bachelorbeginn)\nVerwende akademisch orientierten Wortschatz und moderate sprachliche Komplexität. Die Fragen sollen analytisches und kritisches Denken fördern. Es sind auch hypothetische Szenarien erlaubt. Fremdwörter können vorkommen, aber sollten kontextuell erschließbar sein.",
+    "C1 (Bachelor/Master, Hochschulreife)": "🟠 C1 (Bachelor/Master, Hochschulreife)\nVerwende komplexe Satzstrukturen und einen gehobenen, akademischen Sprachstil. Die Fragen sollen Argumentation, Bewertung und Synthese fördern. Die Lernenden sollen eigenständig Thesen entwickeln und verschiedene Perspektiven vergleichen können.",
+    "C2 (Master/Expertenniveau)": "🔴 C2 (Master/Expertenniveau)\nVerwende präzise, abstrakte und komplexe Sprache. Die Fragen sollen kreative, originelle Denkprozesse anregen und fächerübergreifende Kompetenzen einbeziehen. Es wird ein hohes Maß an Autonomie und metakognitivem Denken vorausgesetzt."
+}
+
+
 @st.cache_data
 def read_prompt_from_md(filename):
     """Liest den Prompt aus einer Markdown-Datei und speichert das Ergebnis zwischen."""
@@ -332,32 +342,44 @@ def transform_output(json_string):
         st.code(json_string)
         return "Fehler: Eingabe konnte nicht verarbeitet werden"
 
-def get_chatgpt_response(prompt, model, images=None, selected_language="English", reasoning_effort="medium"):
+def get_chatgpt_response(prompt, model, images=None, selected_language="English", reasoning_effort="medium", selected_zielniveau=""):
     """Ruft eine Antwort von OpenAI ab und implementiert die Cache-Protokollierung."""
     if not client:
         st.error("Kein gültiger OpenAI-API-Schlüssel vorhanden. Bitte geben Sie Ihren API-Schlüssel ein.")
         return None
 
     # System-Prompt, der für alle Modelle gilt
-    system_prompt = (
+    system_prompt_template = (
         """
         Du bist ein Experte im Bildungsbereich, spezialisiert auf die Erstellung von Testfragen und -antworten zu allen Themen, unter Einhaltung der Bloom's Taxonomy. Deine Aufgabe ist es, hochwertige Frage-Antwort-Sets basierend auf dem vom Benutzer bereitgestellten Material zu erstellen, wobei jede Frage einer spezifischen Ebene der Bloom's Taxonomy entspricht: Erinnern, Verstehen, Anwenden, Analysieren, Bewerten und Erstellen.
+
+        # Zielniveaus
+        [ZIELNIVEAU_INJECTION]
 
         Der Benutzer wird entweder Text oder ein Bild hochladen. Deine Aufgaben sind wie folgt:
 
         **Input-Analyse:**
 
-        - Du analysierst du den Inhalt sorgfältig, um die Schlüsselkonzepte und wichtigen Informationen zu verstehen.
-        - Falls vorhanden, du achtest auf Diagramme, Grafiken, Bilder oder Infografiken, um Bildungsinhalte abzuleiten.
+        - Du analysierst den Inhalt sorgfältig, um die Schlüsselkonzepte und wichtigen Informationen zu verstehen.
+        - Falls vorhanden, achtest du auf Diagramme, Grafiken, Bilder oder Infografiken, um Bildungsinhalte abzuleiten.
 
-        **Fragen-Generierung nach Bloom-Ebene:**
-        Basierend auf dem analysierten Material generierst du Fragen über alle die folgenden Ebenen der Bloom's Taxonomy:
+        **Fragen-Generierung nach Bloom-Ebene und Zielniveau:**
+
+        Basierend auf dem analysierten Material und dem angegebenen Zielniveau generierst du Fragen über alle die folgenden Ebenen der Bloom's Taxonomy. Achte darauf, dass die sprachliche Komplexität, der Umfang der Aufgabenstellung und die kognitiven Anforderungen dem Zielniveau angemessen sind:
 
         - **Erinnern**: Einfache, abrufbasierte Fragen.
         - **Verstehen**: Fragen, die das Verständnis des Materials bewerten.
         - **Anwenden**: Fragen, die die Anwendung des Wissens in praktischen Situationen erfordern.
+        - **Analysieren**: Fragen, die das Zerlegen und Untersuchen von Konzepten und Zusammenhängen erfordern.
+        - **Bewerten**: Fragen, die Urteilsbildung und begründete Meinungen verlangen.
+        - **Erstellen**: Fragen, die kreative Synthese, neue Perspektiven oder eigene Lösungsansätze fördern.
+
+        Achte stets darauf, dass die Formulierungen und kognitiven Anforderungen dem Niveau des vorgesehenen Lernendenkreises entsprechen.
         """
     )
+
+    # Inject the selected Zielniveau into the prompt
+    system_prompt = system_prompt_template.replace("[ZIELNIVEAU_INJECTION]", selected_zielniveau)
 
     try:
 # ---- NEW: Logic for o4-mini Reasoning Model ----
@@ -484,7 +506,7 @@ def get_chatgpt_response(prompt, model, images=None, selected_language="English"
         return None
 
 
-def generate_questions(user_input, learning_goals, selected_types, images, selected_language, selected_model, reasoning_effort):
+def generate_questions(user_input, learning_goals, selected_types, images, selected_language, selected_model, reasoning_effort, selected_zielniveau):
     """Generiert Fragen und implementiert Anwendungs-seitiges Caching."""
     if not client:
         st.error("Ein gültiger OpenAI-API-Schlüssel ist erforderlich, um Fragen zu generieren.")
@@ -540,7 +562,8 @@ def generate_questions(user_input, learning_goals, selected_types, images, selec
                         model=selected_model, 
                         images=images, 
                         selected_language=selected_language,
-                        reasoning_effort=reasoning_effort
+                        reasoning_effort=reasoning_effort,
+                        selected_zielniveau=selected_zielniveau
                     )
                     if response:
                         # Store successful response in cache
@@ -628,6 +651,18 @@ def main():
     selected_language_key = st.radio("Wählen Sie die Sprache für die Ausgabe:", list(languages.keys()), index=0)
     selected_language = languages[selected_language_key]
 
+    # NEW: Zielniveau selection
+    st.subheader("Zielniveau auswählen:")
+    zielniveau_labels = list(ZIELNIVEAUS_MAP.keys())
+    selected_zielniveau_label = st.radio(
+        "Wählen Sie das kognitive und sprachliche Niveau:",
+        zielniveau_labels,
+        index=2,  # Default to B2
+        help="Bestimmt die sprachliche Komplexität und kognitive Anforderung der Fragen."
+    )
+    selected_zielniveau_text = ZIELNIVEAUS_MAP[selected_zielniveau_label]
+
+
     uploaded_files = st.file_uploader(
         "Laden Sie eine PDF, DOCX oder bis zu 10 Bilder hoch",
         type=["pdf", "docx", "jpg", "jpeg", "png"],
@@ -713,7 +748,8 @@ def main():
                 image_content_list, 
                 selected_language, 
                 selected_model,
-                reasoning_effort  # Pass the selected effort
+                reasoning_effort,
+                selected_zielniveau_text # Pass the selected level
             )
         elif not user_input and not image_content_list:
             st.warning("Bitte geben Sie Text ein oder laden Sie eine Datei hoch.")
