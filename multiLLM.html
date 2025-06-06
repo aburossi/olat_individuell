@@ -50,7 +50,6 @@
                     <select id="provider-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
                         <option value="google" selected>Google</option>
                         <option value="openai">OpenAI</option>
-                        <option value="anthropic">Anthropic</option>
                         <option value="deepseek">DeepSeek</option>
                     </select>
                 </div>
@@ -84,19 +83,6 @@
                     </div>
                 </div>
 
-                 <div id="anthropic-config" class="provider-config space-y-4">
-                    <div>
-                        <label for="anthropic_api_key" class="block text-sm font-medium text-gray-700">Anthropic API Schlüssel</label>
-                        <input type="password" id="anthropic_api_key" class="api-key-input mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="Ihr Anthropic API-Schlüssel">
-                    </div>
-                    <div>
-                        <label for="anthropic-model-select" class="block text-sm font-medium text-gray-700">Anthropic Modell</label>
-                        <select id="anthropic-model-select" class="model-select mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 rounded-md">
-                            <option value="claude-3-5-sonnet-20240620" selected>Claude 3.5 Sonnet</option>
-                            <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-                        </select>
-                    </div>
-                </div>
                 
                  <div id="deepseek-config" class="provider-config space-y-4">
                     <div>
@@ -212,7 +198,6 @@
             const API_CONFIGS = {
                 google: { url: 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}', keyId: 'google_api_key', modelId: 'google-model-select' },
                 openai: { url: 'https://api.openai.com/v1/chat/completions', keyId: 'openai_api_key', modelId: 'openai-model-select' },
-                anthropic: { url: 'https://api.anthropic.com/v1/messages', keyId: 'anthropic_api_key', modelId: 'anthropic-model-select' },
                 deepseek: { url: 'https://api.deepseek.com/chat/completions', keyId: 'deepseek_api_key', modelId: 'deepseek-model-select' }
             };
 
@@ -307,13 +292,11 @@
 
                 // 2. Add image parts in the correct format for the provider
                 if (uploadedImages.length > 0) {
-                     if (provider === 'google' || provider === 'anthropic' || provider === 'openai' || provider === 'deepseek') {
+                     if (provider === 'google' || provider === 'openai' || provider === 'deepseek') {
                         const imageParts = uploadedImages.map(img => {
                             switch(provider) {
                                 case 'google':
                                     return { inlineData: { mimeType: img.media_type, data: img.data } };
-                                case 'anthropic':
-                                    return { type: 'image', source: { type: 'base64', media_type: img.media_type, data: img.data } };
                                 case 'openai':
                                 case 'deepseek':
                                     return { type: 'image_url', image_url: { url: `data:${img.media_type};base64,${img.data}` } };
@@ -338,12 +321,6 @@
                         // For these providers, content is a mix of text and image_url objects
                         body = { model: model, messages: [{ role: 'user', content: promptParts }] };
                         break;
-                    case 'anthropic':
-                        headers['x-api-key'] = apiKey;
-                        headers['anthropic-version'] = '2023-06-01';
-                        // For Anthropic, content is also an array of blocks
-                        body = { model: model, max_tokens: 4096, messages: [{ role: 'user', content: promptParts }] };
-                        break;
                 }
                 
                 try {
@@ -359,7 +336,6 @@
                         case 'openai':
                         case 'deepseek':
                             return data.choices[0].message.content;
-                        case 'anthropic': return data.content[0].text;
                         default: return null;
                     }
                 } catch (e) {
