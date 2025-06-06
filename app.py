@@ -68,7 +68,7 @@ with st.sidebar:
     
     # Weitere Anweisungen
     st.markdown("""
-    2. **Laden Sie eine PDF, DOCX oder Bilddatei hoch**: Wählen Sie eine Datei von Ihrem Computer aus.
+    2. **Laden Sie eine PDF, DOCX oder bis zu 10 Bilder hoch**: Wählen Sie eine oder mehrere Dateien von Ihrem Computer aus.
     3. **Sprache auswählen**: Wählen Sie die gewünschte Sprache für die generierten Fragen.
     4. **Fragetypen auswählen**: Wählen Sie die Typen der Fragen, die Sie generieren möchten.
     5. **Fragen generieren**: Klicken Sie auf die Schaltfläche "Fragen generieren", um den Prozess zu starten.
@@ -332,7 +332,7 @@ def transform_output(json_string):
         st.code(json_string)
         return "Fehler: Eingabe konnte nicht verarbeitet werden"
 
-def get_chatgpt_response(prompt, model, image=None, selected_language="English"):
+def get_chatgpt_response(prompt, model, images=None, selected_language="English"):
     """Ruft eine Antwort von OpenAI GPT ab und implementiert die Cache-Protokollierung."""
     if not client:
         st.error("Kein gültiger OpenAI-API-Schlüssel vorhanden. Bitte geben Sie Ihren API-Schlüssel ein.")
@@ -347,29 +347,26 @@ def get_chatgpt_response(prompt, model, image=None, selected_language="English")
             """
         )
         
-        if image:
-            base64_image = process_image(image)
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {
-                    "role": "user", 
-                    "content": [
-                        {"type": "text", "text": f"Generate questions in {selected_language}. {prompt}"},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}",
-                                "detail": "low"
-                            }
+        # Build the user message content
+        user_content = [{"type": "text", "text": f"Generate questions in {selected_language}. {prompt}"}]
+
+        if images:
+            for image in images:
+                base64_image = process_image(image)
+                user_content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_image}",
+                            "detail": "low"
                         }
-                    ]
-                }
-            ]
-        else:
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Generate questions in {selected_language}. {prompt}"}
-            ]
+                    }
+                )
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content}
+        ]
 
         response = client.chat.completions.create(
             model=model,
@@ -407,33 +404,16 @@ def get_chatgpt_response(prompt, model, image=None, selected_language="English")
         logging.error(f"Fehler bei der Kommunikation mit der OpenAI API: {e}")
         return None
 
-
-def process_images(images, selected_language, selected_model):
-    """Verarbeitet hochgeladene Bilder und generiert Fragen mit Caching."""
-    for idx, image in enumerate(images):
-        st.image(image, caption=f'Seite {idx+1}', use_column_width=True)
-
-        user_input = st.text_area(f"Geben Sie Ihre Frage oder Anweisungen für Seite {idx+1} ein:", key=f"text_area_{idx}")
-        learning_goals = st.text_area(f"Lernziele für Seite {idx+1} (Optional):", key=f"learning_goals_{idx}")
-        selected_types = st.multiselect(f"Wählen Sie die Fragetypen für Seite {idx+1} aus:", MESSAGE_TYPES, key=f"selected_types_{idx}")
-
-        if st.button(f"Fragen für Seite {idx+1} generieren", key=f"generate_button_{idx}"):
-            if user_input and selected_types:
-                # Pass page index for unique caching
-                generate_questions(user_input, learning_goals, selected_types, image, selected_language, selected_model, page_index=idx)
-            else:
-                st.warning(f"Bitte geben Sie Text ein und wählen Sie Fragetypen für Seite {idx+1} aus.")
-
-def generate_questions(user_input, learning_goals, selected_types, image, selected_language, selected_model, page_index=None):
+def generate_questions(user_input, learning_goals, selected_types, images, selected_language, selected_model):
     """Generiert Fragen und implementiert Anwendungs-seitiges Caching."""
     if not client:
         st.error("Ein gültiger OpenAI-API-Schlüssel ist erforderlich, um Fragen zu generieren.")
         return
 
     # --- START of Application-Side Caching Logic ---
-    # Create unique keys for session state based on page index
-    cache_key = f"cached_responses_{page_index}" if page_index is not None else "cached_responses"
-    hash_key = f"source_content_hash_{page_index}" if page_index is not None else "source_content_hash"
+    # Use unified cache keys
+    cache_key = "cached_responses"
+    hash_key = "source_content_hash"
     
     # Initialize session state if it doesn't exist
     if cache_key not in st.session_state:
@@ -442,7 +422,10 @@ def generate_questions(user_input, learning_goals, selected_types, image, select
         st.session_state[hash_key] = None
         
     # Create a hash of the current source content to detect changes
-    content_to_hash = user_input + (process_image(image) if image else "")
+    content_to_hash = user_input
+    if images:
+        for img in images:
+            content_to_hash += process_image(img) # process_image returns b64 string
     current_content_hash = hashlib.md5(content_to_hash.encode()).hexdigest()
 
     # If the source content has changed, clear the old cache for this specific context
@@ -467,7 +450,8 @@ def generate_questions(user_input, learning_goals, selected_types, image, select
                 prompt_template = read_prompt_from_md(msg_type)
                 full_prompt = f"{prompt_template}\n\nBenutzereingabe: {user_input}\n\nLernziele: {learning_goals}"
                 try:
-                    response = get_chatgpt_response(full_prompt, model=selected_model, image=image, selected_language=selected_language)
+                    # Pass the list of images to the API call
+                    response = get_chatgpt_response(full_prompt, model=selected_model, images=images, selected_language=selected_language)
                     if response:
                         # Store successful response in cache
                         st.session_state[cache_key][msg_type] = response
@@ -543,66 +527,92 @@ def main():
     selected_language_key = st.radio("Wählen Sie die Sprache für die Ausgabe:", list(languages.keys()), index=0)
     selected_language = languages[selected_language_key]
 
-    uploaded_file = st.file_uploader("Laden Sie eine PDF, DOCX oder Bilddatei hoch", type=["pdf", "docx", "jpg", "jpeg", "png"])
+    uploaded_files = st.file_uploader(
+        "Laden Sie eine PDF, DOCX oder bis zu 10 Bilder hoch",
+        type=["pdf", "docx", "jpg", "jpeg", "png"],
+        accept_multiple_files=True
+    )
 
     text_content = ""
-    image_content = None
-    images = []
+    image_content_list = []
 
-    if uploaded_file:
-        # Clear Streamlit's function cache AND our session state cache
-        if 'last_uploaded_filename' not in st.session_state or st.session_state.last_uploaded_filename != uploaded_file.name:
+    if uploaded_files:
+        # Clear cache if the set of uploaded files changes
+        uploaded_filenames = sorted([f.name for f in uploaded_files])
+        if 'last_uploaded_filenames' not in st.session_state or st.session_state.last_uploaded_filenames != uploaded_filenames:
             st.cache_data.clear()
-            # Clear all potential session state caches
+            # Clear all session state caches
             for key in list(st.session_state.keys()):
                 if key.startswith('cached_responses') or key.startswith('source_content_hash'):
                     del st.session_state[key]
-            st.session_state.last_uploaded_filename = uploaded_file.name
-            st.info("Neue Datei hochgeladen. Alle Caches wurden geleert.")
+            st.session_state.last_uploaded_filenames = uploaded_filenames
+            st.info("Neue Datei(en) hochgeladen. Alle Caches wurden geleert.")
 
-    if uploaded_file is not None:
-        if uploaded_file.type == "application/pdf":
-            text_content, images = process_pdf(uploaded_file)
-            if text_content:
-                st.success("Text aus PDF extrahiert. Sie können ihn nun bearbeiten.")
-            elif images:
-                st.success("PDF in Bilder konvertiert. Sie können jetzt Fragen zu jeder Seite stellen.")
-        elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-            text_content = extract_text_from_docx(uploaded_file)
-            st.success("Text erfolgreich extrahiert. Sie können ihn nun bearbeiten.")
-        elif uploaded_file.type.startswith('image/'):
-            image_content = Image.open(uploaded_file)
-            st.image(image_content, caption='Hochgeladenes Bild', use_column_width=True)
-            st.success("Bild erfolgreich hochgeladen.")
+        # File validation
+        if len(uploaded_files) > 10:
+            st.error("Bitte laden Sie maximal 10 Bilder hoch.")
+            return
+        
+        is_multimedia_upload = len(uploaded_files) > 1
+        has_doc = any(f.name.lower().endswith(('.pdf', '.docx')) for f in uploaded_files)
+        if is_multimedia_upload and has_doc:
+            st.error("Sie können entweder eine einzelne PDF/DOCX-Datei oder mehrere Bilddateien hochladen, aber nicht mischen.")
+            return
 
-    if images:
-        process_images(images, selected_language, selected_model)
-    else:
-        user_input = st.text_area("Geben Sie Ihren Text oder Ihre Frage zum Bild ein:", value=text_content, height=300)
-        learning_goals = st.text_area("Lernziele (Optional):")
-        
-        selected_types = st.multiselect("Wählen Sie die Fragetypen zur Generierung aus:", MESSAGE_TYPES)
-        
-        # Custom CSS for callouts
-        st.markdown(
-            """
-            <style>
-            .custom-info { background-color: #e7f3fe; padding: 10px; border-radius: 5px; border-left: 6px solid #2196F3; }
-            .custom-success { background-color: #d4edda; padding: 10px; border-radius: 5px; border-left: 6px solid #28a745; }
-            .custom-warning { background-color: #fff3cd; padding: 10px; border-radius: 5px; border-left: 6px solid #ffc107; }
-            </style>
-            """, unsafe_allow_html=True
-        )
-        
-        if st.button("Fragen generieren"):
-            if not client:
-                st.error("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein.")
-            elif (user_input or image_content) and selected_types:
-                generate_questions(user_input, learning_goals, selected_types, image_content, selected_language, selected_model)
-            elif not user_input and not image_content:
-                st.warning("Bitte geben Sie Text ein oder laden Sie eine Datei hoch.")
-            elif not selected_types:
-                st.warning("Bitte wählen Sie mindestens einen Fragetyp aus.")
+        # Process files into text and/or images
+        with st.spinner("Dateien werden verarbeitet..."):
+            for uploaded_file in uploaded_files:
+                if uploaded_file.type == "application/pdf":
+                    text_from_pdf, images_from_pdf = process_pdf(uploaded_file)
+                    if text_from_pdf:
+                        text_content += text_from_pdf + "\n\n"
+                    if images_from_pdf:
+                        image_content_list.extend(images_from_pdf)
+                elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                    text_content += extract_text_from_docx(uploaded_file) + "\n\n"
+                elif uploaded_file.type.startswith('image/'):
+                    image_content_list.append(Image.open(uploaded_file))
+
+    # --- UNIFIED UI SECTION ---
+    if image_content_list:
+        st.success(f"{len(image_content_list)} Bild(er) erfolgreich geladen.")
+        # Display images in a grid
+        cols = st.columns(min(len(image_content_list), 5)) # Use max 5 columns
+        for idx, img in enumerate(image_content_list):
+            cols[idx % 5].image(img, use_column_width=True, caption=f"Bild {idx+1}")
+
+    user_input = st.text_area("Geben Sie Ihren Text oder Ihre Frage zum Inhalt ein:", value=text_content.strip(), height=300)
+    learning_goals = st.text_area("Lernziele (Optional):")
+    
+    selected_types = st.multiselect("Wählen Sie die Fragetypen zur Generierung aus:", MESSAGE_TYPES)
+    
+    # Custom CSS for callouts
+    st.markdown(
+        """
+        <style>
+        .custom-info { background-color: #e7f3fe; padding: 10px; border-radius: 5px; border-left: 6px solid #2196F3; }
+        .custom-success { background-color: #d4edda; padding: 10px; border-radius: 5px; border-left: 6px solid #28a745; }
+        .custom-warning { background-color: #fff3cd; padding: 10px; border-radius: 5px; border-left: 6px solid #ffc107; }
+        </style>
+        """, unsafe_allow_html=True
+    )
+    
+    if st.button("Fragen generieren"):
+        if not client:
+            st.error("Bitte geben Sie Ihren OpenAI-API-Schlüssel ein.")
+        elif (user_input or image_content_list) and selected_types:
+            generate_questions(
+                user_input, 
+                learning_goals, 
+                selected_types, 
+                image_content_list, 
+                selected_language, 
+                selected_model
+            )
+        elif not user_input and not image_content_list:
+            st.warning("Bitte geben Sie Text ein oder laden Sie eine Datei hoch.")
+        elif not selected_types:
+            st.warning("Bitte wählen Sie mindestens einen Fragetyp aus.")
 
 if __name__ == "__main__":
     main()
