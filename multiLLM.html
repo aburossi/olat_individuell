@@ -77,7 +77,7 @@
                         <label for="openai_api_key" class="block text-sm font-medium text-gray-700">OpenAI API Schlüssel</label>
                         <input type="password" id="openai_api_key" class="api-key-input mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="Ihr OpenAI API-Schlüssel">
                     </div>
-                     <div>
+                    <div>
                         <label for="openai-model-select" class="block text-sm font-medium text-gray-700">OpenAI Modell</label>
                         <select id="openai-model-select" class="model-select mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 rounded-md">
                             <option value="gpt-4o" selected>GPT-4o</option>
@@ -161,7 +161,8 @@
             <div class="mt-6 p-4 border border-gray-300 rounded-md bg-white">
                 <label class="block text-lg font-semibold text-gray-800">Fragetypen auswählen & generieren</label>
                 <div id="question-types" class="my-4 grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-                <button id="generate-questions-btn" class="w-full bg-indigo-600 text-white font-bold py-3 px-6 rounded-md shadow-lg hover:bg-indigo-700">Fragen generieren</button>
+                 <p class="mt-2 text-xs text-gray-500">* Anmerkung: "Multiple Choice (1/2/3)" bezieht sich auf die Anzahl der korrekten Antworten, die pro Frage generiert werden sollen.</p>
+                <button id="generate-questions-btn" class="w-full bg-indigo-600 text-white font-bold py-3 px-6 rounded-md shadow-lg hover:bg-indigo-700 mt-4">Fragen generieren</button>
             </div>
             
             <div id="output-container" class="mt-8 flex-grow">
@@ -204,7 +205,17 @@
             let uploadedImages = [];
             const promptCache = {};
 
-            const QUESTION_TYPES = ["single_choice", "multiple_choice", "kprim", "true_false", "fill_in_the_blank", "essay", "drag_and_drop_auf_bild"];
+            // === QUESTION TYPES UPDATED TO MATCH YOUR PROMPTS/ DIRECTORY ===
+            const QUESTION_TYPES = [
+                "single_choice", 
+                "multiple_choice1", 
+                "multiple_choice2", 
+                "multiple_choice3", 
+                "kprim", 
+                "truefalse", 
+                "draganddrop", 
+                "inline_fib"
+            ];
             
             const API_CONFIGS = {
                 google: { url: 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}', keyId: 'google_api_key', modelId: 'google-model-select' },
@@ -225,7 +236,15 @@
                     const label = document.createElement('label');
                     label.htmlFor = `type-${type}`;
                     label.className = 'ml-2 text-sm text-gray-700';
-                    label.textContent = type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+                    // === LABEL FORMATTING LOGIC UPDATED FOR CLARITY ===
+                    let labelText = type.replace(/_/g, ' '); // "multiple choice1" -> "multiple choice 1"
+                    if (type.startsWith("multiple_choice")) {
+                         labelText = labelText.replace(/(\d+)/, ' ($1)'); // "multiple choice 1" -> "multiple choice (1)"
+                    }
+                    labelText = labelText.replace(/\b\w/g, l => l.toUpperCase()); // "multiple choice (1)" -> "Multiple Choice (1)"
+                    label.textContent = labelText;
+
                     div.append(checkbox, label);
                     questionTypesContainer.appendChild(div);
                 });
@@ -286,13 +305,14 @@
             async function fetchPromptForType(type) {
                 if (promptCache[type]) return promptCache[type];
                 try {
+                    // This path should now work correctly when run from a local server.
                     const response = await fetch(`./prompts/${type}.md`);
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     const text = await response.text();
                     promptCache[type] = text;
                     return text;
                 } catch (e) {
-                    alert(`Konnte Prompt für "${type}" nicht laden. Stellen Sie sicher, dass die Datei /prompts/${type}.md existiert.`);
+                    alert(`Konnte Prompt für "${type}" nicht laden. Stellen Sie sicher, dass die Datei /prompts/${type}.md existiert und Sie die Seite über einen lokalen Webserver ausführen.`);
                     return null;
                 }
             }
