@@ -161,7 +161,7 @@
             <div class="mt-6 p-4 border border-gray-300 rounded-md bg-white">
                 <label class="block text-lg font-semibold text-gray-800">Fragetypen auswählen & generieren</label>
                 <div id="question-types" class="my-4 grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-                 <p class="mt-2 text-xs text-gray-500">* Anmerkung: "Multiple Choice (1/2/3)" bezieht sich auf die Anzahl der korrekten Antworten, die pro Frage generiert werden sollen.</p>
+                <p class="mt-2 text-xs text-gray-500">* Anmerkung: "Multiple Choice (1/2/3)" bezieht sich auf die Anzahl der korrekten Antworten, die pro Frage generiert werden sollen.</p>
                 <button id="generate-questions-btn" class="w-full bg-indigo-600 text-white font-bold py-3 px-6 rounded-md shadow-lg hover:bg-indigo-700 mt-4">Fragen generieren</button>
             </div>
             
@@ -204,8 +204,7 @@
 
             let uploadedImages = [];
             const promptCache = {};
-
-            // === QUESTION TYPES UPDATED TO MATCH YOUR PROMPTS/ DIRECTORY ===
+            
             const QUESTION_TYPES = [
                 "single_choice", 
                 "multiple_choice1", 
@@ -237,12 +236,11 @@
                     label.htmlFor = `type-${type}`;
                     label.className = 'ml-2 text-sm text-gray-700';
 
-                    // === LABEL FORMATTING LOGIC UPDATED FOR CLARITY ===
-                    let labelText = type.replace(/_/g, ' '); // "multiple choice1" -> "multiple choice 1"
+                    let labelText = type.replace(/_/g, ' ');
                     if (type.startsWith("multiple_choice")) {
-                         labelText = labelText.replace(/(\d+)/, ' ($1)'); // "multiple choice 1" -> "multiple choice (1)"
+                         labelText = labelText.replace(/(\d+)/, ' ($1)');
                     }
-                    labelText = labelText.replace(/\b\w/g, l => l.toUpperCase()); // "multiple choice (1)" -> "Multiple Choice (1)"
+                    labelText = labelText.replace(/\b\w/g, l => l.toUpperCase());
                     label.textContent = labelText;
 
                     div.append(checkbox, label);
@@ -305,7 +303,6 @@
             async function fetchPromptForType(type) {
                 if (promptCache[type]) return promptCache[type];
                 try {
-                    // This path should now work correctly when run from a local server.
                     const response = await fetch(`./prompts/${type}.md`);
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     const text = await response.text();
@@ -419,6 +416,12 @@
                             outputTokens = data.usage?.completion_tokens || 0;
                             break;
                     }
+                    
+                    // === NEW: Clean the output by replacing 'ß' with 'ss' ===
+                    if (text) {
+                        text = text.replace(/ß/g, 'ss');
+                    }
+                    
                 } catch (e) {
                     console.error("Error parsing response:", e);
                     return { text: "## FEHLER BEI DER ANTWORTVERARBEITUNG ##", inputTokens: 0, outputTokens: 0 };
