@@ -65,8 +65,9 @@
                     <div>
                         <label for="google-model-select" class="block text-sm font-medium text-gray-700">Gemini Modell</label>
                         <select id="google-model-select" class="model-select mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 rounded-md">
-                            <option value="gemini-1.5-flash-latest" selected>Gemini 1.5 Flash</option>
-                            <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro</option>
+                            <option value="gemini-2.0-flash" selected>Gemini 2.0 Flash (Schnell)</option>
+                            <option value="gemini-2.5-flash-preview-05-20">Gemini 2.5 Flash (Vorschau)</option>
+                            <option value="gemini-2.5-pro-preview-06-05">Gemini 2.5 Pro (Vorschau)</option>
                         </select>
                     </div>
                 </div>
@@ -76,16 +77,16 @@
                         <label for="openai_api_key" class="block text-sm font-medium text-gray-700">OpenAI API Schlüssel</label>
                         <input type="password" id="openai_api_key" class="api-key-input mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="Ihr OpenAI API-Schlüssel">
                     </div>
-                    <div>
+                     <div>
                         <label for="openai-model-select" class="block text-sm font-medium text-gray-700">OpenAI Modell</label>
                         <select id="openai-model-select" class="model-select mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 rounded-md">
                             <option value="gpt-4o" selected>GPT-4o</option>
-                            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                            <option value="gpt-4.1">GPT-4.1</option>
                         </select>
                     </div>
                 </div>
                 
-                 <div id="deepseek-config" class="provider-config space-y-4">
+                <div id="deepseek-config" class="provider-config space-y-4">
                     <div>
                         <label for="deepseek_api_key" class="block text-sm font-medium text-gray-700">DeepSeek API Schlüssel</label>
                         <input type="password" id="deepseek_api_key" class="api-key-input mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="Ihr DeepSeek API-Schlüssel">
@@ -197,7 +198,6 @@
             const resultsWrapper = document.getElementById('results-wrapper');
             const tokenUsageContainer = document.getElementById('token-usage');
 
-            // --- NEW: API Key Persistence Elements ---
             const saveKeysCheckbox = document.getElementById('save-keys-checkbox');
             const apiKeyInputs = document.querySelectorAll('.api-key-input');
 
@@ -225,7 +225,7 @@
                     const label = document.createElement('label');
                     label.htmlFor = `type-${type}`;
                     label.className = 'ml-2 text-sm text-gray-700';
-                    label.textContent = type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); // Nicer formatting
+                    label.textContent = type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                     div.append(checkbox, label);
                     questionTypesContainer.appendChild(div);
                 });
@@ -237,15 +237,13 @@
                 exploreTopicsBtn.addEventListener('click', handleExploreTopics);
                 downloadBtn.addEventListener('click', handleDownload);
                 
-                // --- NEW: API Key Persistence Logic ---
                 saveKeysCheckbox.addEventListener('change', toggleSaveKeys);
                 apiKeyInputs.forEach(input => input.addEventListener('input', saveApiKeys));
                 loadApiKeys();
 
-                switchProviderConfig.call(providerSelect); // Initial call
+                switchProviderConfig.call(providerSelect);
             }
 
-            // --- NEW: Functions to Save/Load API Keys ---
             function toggleSaveKeys() {
                 if (saveKeysCheckbox.checked) {
                     saveApiKeys();
@@ -288,7 +286,6 @@
             async function fetchPromptForType(type) {
                 if (promptCache[type]) return promptCache[type];
                 try {
-                    // Assuming prompts are in a /prompts directory relative to the HTML file
                     const response = await fetch(`./prompts/${type}.md`);
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     const text = await response.text();
@@ -309,7 +306,7 @@
                     reader.onload = e => {
                         const base64Data = e.target.result.split(',')[1];
                         uploadedImages.push({
-                            mime_type: file.type, // Corrected from media_type
+                            mime_type: file.type,
                             data: base64Data
                         });
 
@@ -355,7 +352,6 @@
                     if (provider === 'google') {
                         promptParts.push(...imageParts);
                     } else if (provider === 'openai' || provider === 'deepseek') {
-                         // For OpenAI/DeepSeek, the text part must come first.
                         promptParts = [{ type: 'text', text: prompt }, ...imageParts];
                     }
                 }
@@ -377,7 +373,7 @@
                         const errText = await response.text();
                         throw new Error(`API Fehler (${response.status}): ${errText}`);
                     }
-                    return await response.json(); // --- MODIFIED: Return full JSON response ---
+                    return await response.json();
                 } catch (e) {
                     console.error("API Call failed:", e);
                     alert(`Fehler: ${e.message}`);
