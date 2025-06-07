@@ -38,13 +38,11 @@
 <body class="bg-gray-100">
 
     <div class="flex flex-col lg:flex-row min-h-screen">
-        <!-- Sidebar -->
         <aside class="w-full lg:w-1/3 xl:w-1/4 bg-white p-6 border-r border-gray-200 shadow-lg">
             <h1 class="text-2xl font-bold mb-6 text-gray-800">📝 Fragen Generator</h1>
 
             <div class="space-y-6">
                 
-                <!-- Provider Selection -->
                 <div>
                     <label for="provider-select" class="block text-sm font-medium text-gray-700">Modell-Anbieter</label>
                     <select id="provider-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
@@ -54,7 +52,11 @@
                     </select>
                 </div>
 
-                <!-- API Key & Model Config Sections -->
+                <div class="flex items-center">
+                    <input type="checkbox" id="save-keys-checkbox" class="h-4 w-4 text-indigo-600 rounded">
+                    <label for="save-keys-checkbox" class="ml-2 block text-sm text-gray-900">API Schlüssel lokal speichern</label>
+                </div>
+
                 <div id="google-config" class="provider-config active space-y-4">
                     <div>
                         <label for="google_api_key" class="block text-sm font-medium text-gray-700">Google (Gemini) API Schlüssel</label>
@@ -63,9 +65,8 @@
                     <div>
                         <label for="google-model-select" class="block text-sm font-medium text-gray-700">Gemini Modell</label>
                         <select id="google-model-select" class="model-select mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 rounded-md">
-                            <option value="gemini-2.0-flash" selected>Gemini 2.0 Flash (Schnell)</option>
-                            <option value="gemini-2.5-flash-preview-05-20">Gemini 2.5 Flash (Vorschau)</option>
-                            <option value="gemini-2.5-pro-preview-06-05">Gemini 2.5 Pro (Vorschau)</option>
+                            <option value="gemini-1.5-flash-latest" selected>Gemini 1.5 Flash</option>
+                            <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro</option>
                         </select>
                     </div>
                 </div>
@@ -79,11 +80,10 @@
                         <label for="openai-model-select" class="block text-sm font-medium text-gray-700">OpenAI Modell</label>
                         <select id="openai-model-select" class="model-select mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 rounded-md">
                             <option value="gpt-4o" selected>GPT-4o</option>
-                            <option value="gpt-4.1">GPT-4 Turbo</option>
+                            <option value="gpt-4-turbo">GPT-4 Turbo</option>
                         </select>
                     </div>
                 </div>
-
                 
                  <div id="deepseek-config" class="provider-config space-y-4">
                     <div>
@@ -94,16 +94,48 @@
                         <label for="deepseek-model-select" class="block text-sm font-medium text-gray-700">DeepSeek Modell</label>
                         <select id="deepseek-model-select" class="model-select mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 rounded-md">
                             <option value="deepseek-chat" selected>DeepSeek Chat</option>
-                             <option value="deepseek-coder">DeepSeek Coder</option>
+                            <option value="deepseek-coder">DeepSeek Coder</option>
                         </select>
                     </div>
                 </div>
 
-
-                <!-- File Uploader -->
                 <div>
+                    <label class="block text-sm font-medium text-gray-700">Sprache der Fragen</label>
+                    <select id="language" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <option value="German" selected>Deutsch</option>
+                        <option value="English">Englisch</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Zielniveau</label>
+                    <select id="zielniveau" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <option value="B2 (obere Sek II, Maturität, Bachelorbeginn)" selected>B2 (Standard)</option>
+                        <option value="A2 (elementar / Primarstufe, frühe Sek I)">A2 (Einfach)</option>
+                    </select>
+                </div>
+            </div>
+        </aside>
+
+        <main class="w-full lg:w-2/3 xl:w-3/4 p-6 lg:p-8 flex flex-col">
+            
+            <div class="flex flex-col md:flex-row gap-6">
+                <div class="w-full md:w-2/3 space-y-4">
+                    <div>
+                        <label for="user_input" class="block text-sm font-medium text-gray-700">Geben Sie hier Ihren Text ein:</label>
+                        <textarea id="user_input" rows="10" class="mt-1 block w-full p-3 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                    </div>
+                     <div>
+                        <label for="learning_goals" class="block text-sm font-medium text-gray-700">Lernziele (optional)</label>
+                        <div class="flex gap-2">
+                             <textarea id="learning_goals" rows="3" class="flex-grow mt-1 block w-full p-3 text-sm border border-gray-300 rounded-md" placeholder="Optionale Lernziele... oder lassen Sie sich welche vorschlagen!"></textarea>
+                             <button id="generate-goals-btn" class="gemini-button text-white font-bold py-2 px-4 rounded-md h-full flex items-center justify-center text-center shadow-lg hover:opacity-90">✨<span class="hidden sm:inline ml-2">Lernziel-Assistent</span></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="w-full md:w-1/3">
                     <label class="block text-sm font-medium text-gray-700">Bilder hochladen (bis zu 5)</label>
-                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md h-full">
                         <div class="space-y-1 text-center">
                             <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
                             <div class="flex text-sm text-gray-600">
@@ -114,61 +146,33 @@
                                 <p class="pl-1">oder hierher ziehen</p>
                             </div>
                             <p class="text-xs text-gray-500">PNG, JPG bis 10MB</p>
+                             <div id="image-previews" class="grid grid-cols-3 gap-2 pt-2"></div>
                         </div>
                     </div>
                 </div>
-                 <div id="image-previews" class="grid grid-cols-3 gap-2"></div>
-
-
-                <!-- Language Selection -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Sprache der Fragen</label>
-                    <select id="language" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                        <option value="German" selected>Deutsch</option>
-                        <option value="English">Englisch</option>
-                    </select>
-                </div>
-
-                <!-- Cognitive Level Selection -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Zielniveau</label>
-                    <select id="zielniveau" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                        <option value="B2 (obere Sek II, Maturität, Bachelorbeginn)" selected>B2 (Standard)</option>
-                        <option value="A2 (elementar / Primarstufe, frühe Sek I)">A2 (Einfach)</option>
-                    </select>
-                </div>
-
-                <!-- Question Type Selection -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Fragetypen</label>
-                    <div id="question-types" class="mt-2 grid grid-cols-2 gap-2"></div>
-                </div>
-
             </div>
-        </aside>
 
-        <!-- Main Content -->
-        <main class="w-full lg:w-2/3 xl:w-3/4 p-6 lg:p-8 flex flex-col">
-            <div class="flex-grow flex flex-col">
-                <label for="user_input" class="block text-sm font-medium text-gray-700">Geben Sie hier Ihren Text ein:</label>
-                <textarea id="user_input" rows="15" class="mt-1 block w-full p-3 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 flex-grow"></textarea>
+            <div class="mt-6">
+                <button id="explore-topics-btn" class="w-full gemini-button text-white font-bold py-3 px-6 rounded-md shadow-lg hover:opacity-90">✨ Themen-Explorer</button>
+                <div id="topic-explorer-results" class="mt-4"></div>
             </div>
-            <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                 <textarea id="learning_goals" rows="4" class="col-span-1 md:col-span-2 mt-1 block w-full p-3 text-sm border border-gray-300 rounded-md" placeholder="Optionale Lernziele... oder lassen Sie sich welche vorschlagen!"></textarea>
-                 <button id="generate-goals-btn" class="gemini-button text-white font-bold py-2 px-4 rounded-md h-full flex items-center justify-center text-center shadow-lg hover:opacity-90">✨ Lernziel-Assistent</button>
+            
+            <div class="mt-6 p-4 border border-gray-300 rounded-md bg-white">
+                <label class="block text-lg font-semibold text-gray-800">Fragetypen auswählen & generieren</label>
+                <div id="question-types" class="my-4 grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+                <button id="generate-questions-btn" class="w-full bg-indigo-600 text-white font-bold py-3 px-6 rounded-md shadow-lg hover:bg-indigo-700">Fragen generieren</button>
             </div>
-            <div class="mt-6 flex flex-col sm:flex-row gap-4">
-                <button id="generate-questions-btn" class="flex-1 bg-indigo-600 text-white font-bold py-3 px-6 rounded-md shadow-lg hover:bg-indigo-700">Fragen generieren</button>
-                 <button id="explore-topics-btn" class="flex-1 gemini-button text-white font-bold py-3 px-6 rounded-md shadow-lg hover:opacity-90">✨ Themen-Explorer</button>
-            </div>
+            
             <div id="output-container" class="mt-8 flex-grow">
                 <h2 class="text-xl font-semibold mb-4 text-gray-800">Generierter Inhalt</h2>
                 <div id="spinner" class="hidden mx-auto my-8 loader"></div>
-                <div id="results" class="bg-white p-4 rounded-md shadow-sm border min-h-[200px] overflow-x-hidden">
-                    <div id="topic-explorer-results" class="mb-6"></div>
-                    <pre id="all-responses" class="whitespace-pre-wrap text-sm text-gray-700"></pre>
+                <div id="results-wrapper">
+                    <div id="token-usage" class="text-sm text-right text-gray-600 mb-2"></div>
+                    <div id="results" class="bg-white p-4 rounded-md shadow-sm border min-h-[200px] overflow-x-hidden">
+                        <pre id="all-responses" class="whitespace-pre-wrap text-sm text-gray-700"></pre>
+                    </div>
+                    <button id="download-btn" class="mt-4 bg-green-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-green-700 hidden">Alle Antworten herunterladen</button>
                 </div>
-                 <button id="download-btn" class="mt-4 bg-green-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-green-700 hidden">Alle Antworten herunterladen</button>
             </div>
         </main>
     </div>
@@ -190,11 +194,17 @@
             const allResponsesContainer = document.getElementById('all-responses');
             const topicExplorerResultsContainer = document.getElementById('topic-explorer-results');
             const downloadBtn = document.getElementById('download-btn');
+            const resultsWrapper = document.getElementById('results-wrapper');
+            const tokenUsageContainer = document.getElementById('token-usage');
+
+            // --- NEW: API Key Persistence Elements ---
+            const saveKeysCheckbox = document.getElementById('save-keys-checkbox');
+            const apiKeyInputs = document.querySelectorAll('.api-key-input');
 
             let uploadedImages = [];
             const promptCache = {};
 
-            const QUESTION_TYPES = ["single_choice", "multiple_choice1", "multiple_choice2", "multiple_choice3", "kprim", "truefalse", "draganddrop", "inline_fib"];
+            const QUESTION_TYPES = ["single_choice", "multiple_choice", "kprim", "true_false", "fill_in_the_blank", "essay", "drag_and_drop_auf_bild"];
             
             const API_CONFIGS = {
                 google: { url: 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}', keyId: 'google_api_key', modelId: 'google-model-select' },
@@ -211,11 +221,11 @@
                     checkbox.name = 'question_type';
                     checkbox.type = 'checkbox';
                     checkbox.value = type;
-                    checkbox.className = 'h-4 w-4 text-indigo-600 rounded';
+                    checkbox.className = 'h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500';
                     const label = document.createElement('label');
                     label.htmlFor = `type-${type}`;
-                    label.className = 'ml-2 text-sm';
-                    label.textContent = type.replace(/_/g, ' ').replace(/\d/g, m => ' ' + m);
+                    label.className = 'ml-2 text-sm text-gray-700';
+                    label.textContent = type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); // Nicer formatting
                     div.append(checkbox, label);
                     questionTypesContainer.appendChild(div);
                 });
@@ -226,7 +236,48 @@
                 generateQuestionsBtn.addEventListener('click', handleGenerateQuestions);
                 exploreTopicsBtn.addEventListener('click', handleExploreTopics);
                 downloadBtn.addEventListener('click', handleDownload);
+                
+                // --- NEW: API Key Persistence Logic ---
+                saveKeysCheckbox.addEventListener('change', toggleSaveKeys);
+                apiKeyInputs.forEach(input => input.addEventListener('input', saveApiKeys));
+                loadApiKeys();
+
                 switchProviderConfig.call(providerSelect); // Initial call
+            }
+
+            // --- NEW: Functions to Save/Load API Keys ---
+            function toggleSaveKeys() {
+                if (saveKeysCheckbox.checked) {
+                    saveApiKeys();
+                    alert('API Schlüssel werden jetzt bei Eingabe lokal gespeichert.');
+                } else {
+                    localStorage.removeItem('apiKeys');
+                    localStorage.removeItem('saveApiKeysPreference');
+                    alert('Lokales Speichern der API Schlüssel deaktiviert. Gespeicherte Schlüssel wurden entfernt.');
+                }
+            }
+
+            function saveApiKeys() {
+                if (saveKeysCheckbox.checked) {
+                    const keys = {
+                        google: document.getElementById('google_api_key').value,
+                        openai: document.getElementById('openai_api_key').value,
+                        deepseek: document.getElementById('deepseek_api_key').value,
+                    };
+                    localStorage.setItem('apiKeys', JSON.stringify(keys));
+                    localStorage.setItem('saveApiKeysPreference', 'true');
+                }
+            }
+            
+            function loadApiKeys() {
+                const preference = localStorage.getItem('saveApiKeysPreference');
+                if (preference === 'true') {
+                    saveKeysCheckbox.checked = true;
+                    const savedKeys = JSON.parse(localStorage.getItem('apiKeys') || '{}');
+                    if (savedKeys.google) document.getElementById('google_api_key').value = savedKeys.google;
+                    if (savedKeys.openai) document.getElementById('openai_api_key').value = savedKeys.openai;
+                    if (savedKeys.deepseek) document.getElementById('deepseek_api_key').value = savedKeys.deepseek;
+                }
             }
 
             function switchProviderConfig() {
@@ -237,13 +288,14 @@
             async function fetchPromptForType(type) {
                 if (promptCache[type]) return promptCache[type];
                 try {
-                    const response = await fetch(`prompts/${type}.md`);
+                    // Assuming prompts are in a /prompts directory relative to the HTML file
+                    const response = await fetch(`./prompts/${type}.md`);
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     const text = await response.text();
                     promptCache[type] = text;
                     return text;
                 } catch (e) {
-                    alert(`Konnte Prompt für "${type}" nicht laden.`);
+                    alert(`Konnte Prompt für "${type}" nicht laden. Stellen Sie sicher, dass die Datei /prompts/${type}.md existiert.`);
                     return null;
                 }
             }
@@ -257,7 +309,7 @@
                     reader.onload = e => {
                         const base64Data = e.target.result.split(',')[1];
                         uploadedImages.push({
-                            media_type: file.type,
+                            mime_type: file.type, // Corrected from media_type
                             data: base64Data
                         });
 
@@ -285,33 +337,29 @@
                 let headers = { 'Content-Type': 'application/json' };
                 let body;
                 
-                // --- CORRECTED PAYLOAD LOGIC ---
-                let contentPayload;
-
-                // 1. Start with the text part
                 let promptParts = [{ type: 'text', text: prompt }];
 
-                // 2. Add image parts in the correct format for the provider
                 if (uploadedImages.length > 0) {
-                     if (provider === 'google' || provider === 'openai' || provider === 'deepseek') {
-                        const imageParts = uploadedImages.map(img => {
-                            switch(provider) {
-                                case 'google':
-                                    return { inlineData: { mimeType: img.media_type, data: img.data } };
-                                case 'openai':
-                                case 'deepseek':
-                                    return { type: 'image_url', image_url: { url: `data:${img.media_type};base64,${img.data}` } };
-                                default:
-                                    return null;
-                            }
-                        }).filter(p => p !== null);
+                    const imageParts = uploadedImages.map(img => {
+                        switch(provider) {
+                            case 'google':
+                                return { inlineData: { mimeType: img.mime_type, data: img.data } };
+                            case 'openai':
+                            case 'deepseek':
+                                return { type: 'image_url', image_url: { url: `data:${img.mime_type};base64,${img.data}` } };
+                            default:
+                                return null;
+                        }
+                    }).filter(p => p !== null);
+                    
+                    if (provider === 'google') {
                         promptParts.push(...imageParts);
-                     } else {
-                         alert(`Bild-Uploads werden von ${provider} derzeit nicht unterstützt.`);
-                     }
+                    } else if (provider === 'openai' || provider === 'deepseek') {
+                         // For OpenAI/DeepSeek, the text part must come first.
+                        promptParts = [{ type: 'text', text: prompt }, ...imageParts];
+                    }
                 }
-
-                // 3. Construct the final request body for each provider
+                
                 switch (provider) {
                     case 'google':
                         body = { contents: [{ parts: promptParts }] };
@@ -319,26 +367,17 @@
                     case 'openai':
                     case 'deepseek':
                         headers.Authorization = `Bearer ${apiKey}`;
-                        // For these providers, content is a mix of text and image_url objects
-                        body = { model: model, messages: [{ role: 'user', content: promptParts }] };
+                        body = { model: model, messages: [{ role: 'user', content: (uploadedImages.length > 0) ? promptParts : prompt }] };
                         break;
                 }
                 
                 try {
                     const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
                     if (!response.ok) {
-                        const errText = await response.text(); // Get raw text for better debugging
+                        const errText = await response.text();
                         throw new Error(`API Fehler (${response.status}): ${errText}`);
                     }
-                    const data = await response.json();
-
-                    switch (provider) {
-                        case 'google': return data.candidates[0].content.parts[0].text;
-                        case 'openai':
-                        case 'deepseek':
-                            return data.choices[0].message.content;
-                        default: return null;
-                    }
+                    return await response.json(); // --- MODIFIED: Return full JSON response ---
                 } catch (e) {
                     console.error("API Call failed:", e);
                     alert(`Fehler: ${e.message}`);
@@ -346,63 +385,125 @@
                 }
             }
             
+            function extractContentAndTokens(provider, data) {
+                if (!data) return { text: null, inputTokens: 0, outputTokens: 0 };
+                let text, inputTokens = 0, outputTokens = 0;
+
+                try {
+                    switch (provider) {
+                        case 'google':
+                            text = data.candidates[0].content.parts[0].text;
+                            inputTokens = data.usageMetadata?.promptTokenCount || 0;
+                            outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+                            break;
+                        case 'openai':
+                        case 'deepseek':
+                            text = data.choices[0].message.content;
+                            inputTokens = data.usage?.prompt_tokens || 0;
+                            outputTokens = data.usage?.completion_tokens || 0;
+                            break;
+                    }
+                } catch (e) {
+                    console.error("Error parsing response:", e);
+                    return { text: "## FEHLER BEI DER ANTWORTVERARBEITUNG ##", inputTokens: 0, outputTokens: 0 };
+                }
+                return { text, inputTokens, outputTokens };
+            }
+
             async function handleGenerateGoals() {
                 if (!userInput.value.trim() && uploadedImages.length === 0) return alert("Bitte geben Sie Text ein oder laden Sie Bilder hoch.");
                 showSpinner(true);
                 const prompt = `Analysiere den Inhalt und generiere 3-5 Lernziele für das Niveau "${zielniveauSelect.value}". Formuliere sie als "Die Lernenden können...".`;
-                const result = await callApi(assembleFullPrompt(prompt, userInput.value, ""));
-                if(result) learningGoalsInput.value = result;
+                const resultData = await callApi(assembleFullPrompt(prompt, userInput.value, ""));
+                
+                const { text, inputTokens, outputTokens } = extractContentAndTokens(providerSelect.value, resultData);
+                if(text) learningGoalsInput.value = text;
+                updateTokenCount(inputTokens, outputTokens);
                 showSpinner(false);
             }
             
             async function handleExploreTopics() {
-                 if (!userInput.value.trim() && uploadedImages.length === 0) return alert("Bitte geben Sie Text ein oder laden Sie Bilder hoch.");
+                if (!userInput.value.trim() && uploadedImages.length === 0) return alert("Bitte geben Sie Text ein oder laden Sie Bilder hoch.");
                 showSpinner(true);
                 topicExplorerResultsContainer.innerHTML = '';
-                const prompt = `Analysiere den Inhalt. Schlage 3-5 verwandte Themen vor. Formatiere als HTML mit <h4> und <p> Tags.`;
-                const result = await callApi(assembleFullPrompt(prompt, userInput.value, ""));
-                 if(result) topicExplorerResultsContainer.innerHTML = `<h3 class="text-lg font-semibold mb-2 text-indigo-700">✨ Themen-Explorer</h3><div class="p-4 bg-indigo-50 rounded-md">${result}</div>`;
+                const prompt = `Analysiere den bereitgestellten Text und/oder die Bilder. Schlage 3-5 verwandte Themen oder Konzepte vor, die zur Vertiefung des Verständnisses geeignet sind. Formatiere deine Antwort als sauberes HTML. Verwende <h4> für jeden Thementitel und einen nachfolgenden <p> Tag für eine kurze Beschreibung (1-2 Sätze). Gib NUR das HTML aus.`;
+                const resultData = await callApi(assembleFullPrompt(prompt, userInput.value, ""));
+
+                const { text, inputTokens, outputTokens } = extractContentAndTokens(providerSelect.value, resultData);
+                if(text) topicExplorerResultsContainer.innerHTML = `<h3 class="text-lg font-semibold mb-2 text-indigo-700">✨ Verwandte Themen</h3><div class="p-4 bg-indigo-50 rounded-md">${text}</div>`;
+                updateTokenCount(inputTokens, outputTokens);
                 showSpinner(false);
             }
 
             async function handleGenerateQuestions() {
                 const selectedTypes = Array.from(document.querySelectorAll('input[name="question_type"]:checked')).map(cb => cb.value);
-                if ((!userInput.value.trim() && uploadedImages.length === 0) || selectedTypes.length === 0) return alert("Bitte geben Sie Text ein und wählen Sie Fragetypen.");
+                if ((!userInput.value.trim() && uploadedImages.length === 0) || selectedTypes.length === 0) return alert("Bitte geben Sie Material ein und wählen Sie mindestens einen Fragetyp.");
 
                 showSpinner(true);
-                allResponsesContainer.textContent = '';
-                topicExplorerResultsContainer.innerHTML = '';
+                clearOutputs();
                 let allGeneratedResponses = '';
+                let totalInputTokens = 0;
+                let totalOutputTokens = 0;
 
                 for (const type of selectedTypes) {
                     const basePrompt = await fetchPromptForType(type);
                     if (!basePrompt) continue;
+                    
                     const fullPrompt = assembleFullPrompt(basePrompt, userInput.value, learningGoalsInput.value);
-                    const result = await callApi(fullPrompt);
-                    if (result) allGeneratedResponses += result + '\n\n---\n\n';
-                    else allGeneratedResponses += `## FEHLER FÜR ${type.toUpperCase()} ##\nKeine Antwort erhalten.\n\n---\n\n`;
+                    const resultData = await callApi(fullPrompt);
+                    const { text, inputTokens, outputTokens } = extractContentAndTokens(providerSelect.value, resultData);
+                    
+                    totalInputTokens += inputTokens;
+                    totalOutputTokens += outputTokens;
+
+                    if (text) {
+                        allGeneratedResponses += `## ${type.replace(/_/g, ' ').toUpperCase()} ##\n\n${text}\n\n---\n\n`;
+                    } else {
+                        allGeneratedResponses += `## FEHLER FÜR ${type.toUpperCase()} ##\nKeine Antwort vom Server erhalten.\n\n---\n\n`;
+                    }
                 }
                 
                 allResponsesContainer.textContent = allGeneratedResponses;
+                updateTokenCount(totalInputTokens, totalOutputTokens);
                 downloadBtn.style.display = allGeneratedResponses ? 'block' : 'none';
                 showSpinner(false);
             }
+            
+            function updateTokenCount(input, output) {
+                if (input > 0 || output > 0) {
+                    tokenUsageContainer.textContent = `Tokens: ${input} (Input) / ${output} (Output) / ${input + output} (Total)`;
+                } else {
+                    tokenUsageContainer.textContent = '';
+                }
+            }
+
+            function clearOutputs() {
+                allResponsesContainer.textContent = '';
+                topicExplorerResultsContainer.innerHTML = '';
+                updateTokenCount(0, 0);
+            }
 
             function assembleFullPrompt(basePrompt, text, goals) {
-                return `${basePrompt}\n\n## CONTEXT ##\nLanguage: ${languageSelect.value}\nZielniveau: ${zielniveauSelect.value}\nLearning Goals: """${goals}"""\n\n## MATERIAL ##\n"""${text}"""`;
+                return `${basePrompt}\n\n## CONTEXT ##\nLanguage: ${languageSelect.value}\nZielniveau: ${zielniveauSelect.value}\nLearning Goals: """${goals || 'Keine spezifischen Lernziele vorgegeben.'}"""\n\n## MATERIAL ##\n"""${text}"""`;
             }
             
             function handleDownload() {
-                const blob = new Blob([allResponsesContainer.textContent], { type: 'text/plain' });
+                const blob = new Blob([allResponsesContainer.textContent], { type: 'text/plain;charset=utf-8' });
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
                 a.download = 'olat_fragen.txt';
+                document.body.appendChild(a);
                 a.click();
+                document.body.removeChild(a);
             }
             
             function showSpinner(show) {
                 spinner.style.display = show ? 'block' : 'none';
-                document.getElementById('results').style.display = show ? 'none' : 'block';
+                resultsWrapper.style.display = show ? 'none' : 'block';
+                 if(show) {
+                     clearOutputs();
+                     downloadBtn.style.display = 'none';
+                 }
             }
             
             initializeUI();
